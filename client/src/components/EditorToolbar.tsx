@@ -14,7 +14,6 @@ import {
   ZoomOut,
   RotateCw,
   Trash2,
-  Download,
   Trash,
   Image,
   FolderOpen,
@@ -33,7 +32,6 @@ interface EditorToolbarProps {
   onDeleteSelected: () => void;
   hasSelection: boolean;
   selectionIsFurniture: boolean;
-  onExportPdf: () => void;
   onSavePlan: () => void;
   onLoadPlan: () => void;
   onClearAll: () => void;
@@ -63,7 +61,6 @@ export default function EditorToolbar({
   onDeleteSelected,
   hasSelection,
   selectionIsFurniture,
-  onExportPdf,
   onSavePlan,
   onLoadPlan,
   onClearAll,
@@ -214,10 +211,6 @@ export default function EditorToolbar({
           </TooltipTrigger>
           <TooltipContent><p>Load Plan (JSON)</p></TooltipContent>
         </Tooltip>
-        <Button size="sm" onClick={onExportPdf} data-testid="btn-export-pdf">
-          <Download className="h-4 w-4 mr-1" />
-          Export PDF
-        </Button>
       </div>
     </div>
   );

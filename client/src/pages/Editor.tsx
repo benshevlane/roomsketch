@@ -7,7 +7,6 @@ import PropertiesPanel from "../components/PropertiesPanel";
 import RoomSketchLogo from "../components/RoomSketchLogo";
 import { PerplexityAttribution } from "../components/PerplexityAttribution";
 import { FurnitureTemplate, FurnitureItem, RoomLabel, Point, UnitSystem } from "../lib/types";
-import { exportToPdf } from "../lib/pdf-export";
 import html2canvas from "html2canvas";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -194,63 +193,11 @@ export default function Editor() {
     if (selectedLabel) editor.removeLabel(selectedLabel.id);
   }, [selectedWall, selectedFurniture, selectedLabel, editor]);
 
-  const handleExportPdf = useCallback(() => {
-    exportToPdf(state, state.roomName);
-    showToast("PDF exported successfully");
-  }, [state, showToast]);
-
   const handleSavePlan = useCallback(async () => {
     try {
-      // Find the canvas container and the actual canvas element
+      // Find the canvas container
       const canvasContainer = document.querySelector('[data-testid="canvas-container"]') as HTMLElement;
       if (!canvasContainer) return;
-
-      // Draw branding watermark directly on the floor plan canvas before capture
-      const mainCanvas = canvasContainer.querySelector('canvas') as HTMLCanvasElement | null;
-      let savedImageData: ImageData | null = null;
-      if (mainCanvas) {
-        const ctx = mainCanvas.getContext('2d');
-        if (ctx) {
-          // Save the current canvas state so we can restore after capture
-          savedImageData = ctx.getImageData(0, 0, mainCanvas.width, mainCanvas.height);
-
-          const w = mainCanvas.width;
-          const h = mainCanvas.height;
-          const text = "Made with roomsketch.io";
-          const fontSize = Math.max(12, Math.round(h * 0.016));
-          ctx.save();
-          ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
-          const metrics = ctx.measureText(text);
-          const textW = metrics.width;
-          const padX = fontSize * 0.7;
-          const padY = fontSize * 0.4;
-          const boxW = textW + padX * 2;
-          const boxH = fontSize + padY * 2;
-          const bx = w - boxW - 12;
-          const by = h - boxH - 12;
-
-          // Semi-transparent background pill
-          ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-          const radius = boxH / 2;
-          ctx.beginPath();
-          ctx.moveTo(bx + radius, by);
-          ctx.lineTo(bx + boxW - radius, by);
-          ctx.arcTo(bx + boxW, by, bx + boxW, by + radius, radius);
-          ctx.arcTo(bx + boxW, by + boxH, bx + boxW - radius, by + boxH, radius);
-          ctx.lineTo(bx + radius, by + boxH);
-          ctx.arcTo(bx, by + boxH, bx, by + boxH - radius, radius);
-          ctx.arcTo(bx, by, bx + radius, by, radius);
-          ctx.closePath();
-          ctx.fill();
-
-          // White text
-          ctx.fillStyle = "#ffffff";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(text, bx + boxW / 2, by + boxH / 2);
-          ctx.restore();
-        }
-      }
 
       const capture = await html2canvas(canvasContainer, {
         backgroundColor: null,
@@ -258,13 +205,52 @@ export default function Editor() {
         useCORS: true,
       });
 
-      // Restore the original canvas (remove the watermark from the live view)
-      if (mainCanvas && savedImageData) {
-        const ctx = mainCanvas.getContext('2d');
-        if (ctx) ctx.putImageData(savedImageData, 0, 0);
-      }
+      // Create a new canvas to composite the capture + watermark
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = capture.width;
+      finalCanvas.height = capture.height;
+      const ctx = finalCanvas.getContext('2d')!;
 
-      capture.toBlob((blob) => {
+      // Draw the captured image
+      ctx.drawImage(capture, 0, 0);
+
+      // Draw branding watermark
+      const w = finalCanvas.width;
+      const h = finalCanvas.height;
+      const text = "Made with roomsketch.io";
+      const fontSize = Math.max(14, Math.round(h * 0.018));
+      ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+      const metrics = ctx.measureText(text);
+      const textW = metrics.width;
+      const padX = fontSize * 0.7;
+      const padY = fontSize * 0.45;
+      const boxW = textW + padX * 2;
+      const boxH = fontSize + padY * 2;
+      const margin = Math.round(h * 0.015);
+      const bx = w - boxW - margin;
+      const by = h - boxH - margin;
+
+      // Semi-transparent background pill
+      ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+      const radius = boxH / 2;
+      ctx.beginPath();
+      ctx.moveTo(bx + radius, by);
+      ctx.lineTo(bx + boxW - radius, by);
+      ctx.arcTo(bx + boxW, by, bx + boxW, by + radius, radius);
+      ctx.arcTo(bx + boxW, by + boxH, bx + boxW - radius, by + boxH, radius);
+      ctx.lineTo(bx + radius, by + boxH);
+      ctx.arcTo(bx, by + boxH, bx, by + boxH - radius, radius);
+      ctx.arcTo(bx, by, bx + radius, by, radius);
+      ctx.closePath();
+      ctx.fill();
+
+      // White text
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, bx + boxW / 2, by + boxH / 2);
+
+      finalCanvas.toBlob((blob) => {
         if (!blob) return;
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -410,7 +396,6 @@ export default function Editor() {
         onDeleteSelected={handleDeleteSelected}
         hasSelection={hasSelection}
         selectionIsFurniture={!!selectedFurniture}
-        onExportPdf={handleExportPdf}
         onSavePlan={handleSavePlan}
         onLoadPlan={handleLoadPlan}
         onClearAll={() => setShowClearDialog(true)}
