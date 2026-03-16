@@ -7,6 +7,7 @@
     { "source": "/app/(.*)", "destination": "/index.html" }
   ],
   "routes": [
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
     { "src": "/room-planner", "dest": "/room-planner.html" },
     { "src": "/kitchen-planner", "dest": "/kitchen-planner.html" },
     { "src": "/bathroom-planner", "dest": "/bathroom-planner.html" },
