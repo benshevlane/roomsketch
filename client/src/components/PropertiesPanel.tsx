@@ -50,7 +50,7 @@ export default function PropertiesPanel({
             <span className="font-medium">{selectedWall.thickness}cm</span>
           </div>
         </div>
-        <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive w-full mt-2" data-testid="btn-delete-wall">
+        <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive w-full mt-2 min-h-[44px] md:min-h-0" data-testid="btn-delete-wall">
           <Trash2 className="h-3.5 w-3.5 mr-1" />
           Delete Wall
         </Button>
@@ -83,7 +83,7 @@ export default function PropertiesPanel({
                   x: selectedFurniture.x - delta / 2,
                 });
               }}
-              className="h-7 w-20 text-sm"
+              className="h-9 w-24 text-sm md:h-7 md:w-20"
               data-testid="input-furniture-width"
             />
             <span className="text-muted-foreground text-xs">cm</span>
@@ -102,7 +102,7 @@ export default function PropertiesPanel({
                   y: selectedFurniture.y - delta / 2,
                 });
               }}
-              className="h-7 w-20 text-sm"
+              className="h-9 w-24 text-sm md:h-7 md:w-20"
               data-testid="input-furniture-height"
             />
             <span className="text-muted-foreground text-xs">cm</span>
@@ -117,14 +117,14 @@ export default function PropertiesPanel({
           </div>
         </div>
         <div className="flex gap-1 pt-1">
-          <Button size="sm" variant="secondary" onClick={onRotate} className="flex-1" data-testid="btn-rotate-furniture">
+          <Button size="sm" variant="secondary" onClick={onRotate} className="flex-1 min-h-[44px] md:min-h-0" data-testid="btn-rotate-furniture">
             <RotateCw className="h-3.5 w-3.5 mr-1" />
             Rotate
           </Button>
-          <Button size="sm" variant="secondary" onClick={onDuplicate} data-testid="btn-duplicate-furniture">
+          <Button size="sm" variant="secondary" onClick={onDuplicate} className="min-h-[44px] md:min-h-0" data-testid="btn-duplicate-furniture">
             <Copy className="h-3.5 w-3.5" />
           </Button>
-          <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive" data-testid="btn-delete-furniture">
+          <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive min-h-[44px] md:min-h-0" data-testid="btn-delete-furniture">
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -138,11 +138,11 @@ export default function PropertiesPanel({
         <p className="text-sm font-semibold">Label</p>
         <p className="text-sm">{selectedLabel.text}</p>
         <div className="flex gap-1 pt-1">
-          <Button size="sm" variant="secondary" onClick={onDuplicate} className="flex-1" data-testid="btn-duplicate-label">
+          <Button size="sm" variant="secondary" onClick={onDuplicate} className="flex-1 min-h-[44px] md:min-h-0" data-testid="btn-duplicate-label">
             <Copy className="h-3.5 w-3.5 mr-1" />
             Duplicate
           </Button>
-          <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive" data-testid="btn-delete-label">
+          <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive min-h-[44px] md:min-h-0" data-testid="btn-delete-label">
             <Trash2 className="h-3.5 w-3.5 mr-1" />
             Delete
           </Button>

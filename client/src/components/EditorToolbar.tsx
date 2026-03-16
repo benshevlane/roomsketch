@@ -3,6 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   MousePointer2,
   Pencil,
   Type,
@@ -17,6 +24,9 @@ import {
   Trash,
   Image,
   FolderOpen,
+  MoreHorizontal,
+  LayoutList,
+  SlidersHorizontal,
 } from "lucide-react";
 
 interface EditorToolbarProps {
@@ -40,6 +50,9 @@ interface EditorToolbarProps {
   onToggleUnits: () => void;
   measureMode: MeasureMode;
   onToggleMeasureMode: () => void;
+  isMobile?: boolean;
+  onToggleFurniturePanel?: () => void;
+  onTogglePropertiesPanel?: () => void;
 }
 
 const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
@@ -71,7 +84,115 @@ export default function EditorToolbar({
   onToggleUnits,
   measureMode,
   onToggleMeasureMode,
+  isMobile,
+  onToggleFurniturePanel,
+  onTogglePropertiesPanel,
 }: EditorToolbarProps) {
+  if (isMobile) {
+    const btnClass = "h-11 w-11";
+    return (
+      <div className="border-b border-border bg-card" data-testid="editor-toolbar">
+        {/* Row 1: Library + Tools + Undo/Redo + Properties */}
+        <div className="flex items-center gap-0.5 px-2 py-1">
+          <Button size="icon" variant="ghost" className={btnClass} onClick={onToggleFurniturePanel} data-testid="btn-library">
+            <LayoutList className="h-5 w-5" />
+          </Button>
+
+          <Separator orientation="vertical" className="h-6 mx-0.5" />
+
+          {tools.map(({ tool, icon: Icon }) => (
+            <Button
+              key={tool}
+              size="icon"
+              variant={selectedTool === tool ? "default" : "ghost"}
+              className={btnClass}
+              onClick={() => onSetTool(tool)}
+              data-testid={`tool-${tool}`}
+            >
+              <Icon className="h-5 w-5" />
+            </Button>
+          ))}
+
+          <Separator orientation="vertical" className="h-6 mx-0.5" />
+
+          <Button size="icon" variant="ghost" className={btnClass} onClick={onUndo} disabled={!canUndo} data-testid="btn-undo">
+            <Undo2 className="h-5 w-5" />
+          </Button>
+          <Button size="icon" variant="ghost" className={btnClass} onClick={onRedo} disabled={!canRedo} data-testid="btn-redo">
+            <Redo2 className="h-5 w-5" />
+          </Button>
+
+          <div className="flex-1" />
+
+          <Button size="icon" variant="ghost" className={btnClass} onClick={onTogglePropertiesPanel} data-testid="btn-properties">
+            <SlidersHorizontal className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* Row 2: Zoom + Selection actions + Overflow menu */}
+        <div className="flex items-center gap-0.5 px-2 pb-1">
+          <Button size="icon" variant="ghost" className={btnClass} onClick={onZoomOut} data-testid="btn-zoom-out">
+            <ZoomOut className="h-5 w-5" />
+          </Button>
+          <span className="text-xs text-muted-foreground w-12 text-center tabular-nums" data-testid="zoom-level">
+            {Math.round(zoom * 100)}%
+          </span>
+          <Button size="icon" variant="ghost" className={btnClass} onClick={onZoomIn} data-testid="btn-zoom-in">
+            <ZoomIn className="h-5 w-5" />
+          </Button>
+
+          {hasSelection && (
+            <>
+              <Separator orientation="vertical" className="h-6 mx-0.5" />
+              {selectionIsFurniture && (
+                <Button size="icon" variant="ghost" className={btnClass} onClick={onRotateSelected} data-testid="btn-rotate">
+                  <RotateCw className="h-5 w-5" />
+                </Button>
+              )}
+              <Button size="icon" variant="ghost" className={btnClass} onClick={onDeleteSelected} data-testid="btn-delete-selected">
+                <Trash2 className="h-5 w-5" />
+              </Button>
+            </>
+          )}
+
+          <div className="flex-1" />
+
+          {/* Overflow menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" className={btnClass} data-testid="btn-more">
+                <MoreHorizontal className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onSavePlan}>
+                <Image className="h-4 w-4 mr-2" />
+                Save Image
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onLoadPlan}>
+                <FolderOpen className="h-4 w-4 mr-2" />
+                Load Plan
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onToggleUnits}>
+                Units: {units === "metric" ? "Metres" : "Feet"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleMeasureMode}>
+                Measure: {measureMode === "full" ? "Full Wall" : "Inside"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onClearAll} className="text-destructive">
+                <Trash className="h-4 w-4 mr-2" />
+                Clear All
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop layout (unchanged)
   return (
     <div className="flex items-center gap-1 px-3 py-2 border-b border-border bg-card" data-testid="editor-toolbar">
       {/* Tools */}

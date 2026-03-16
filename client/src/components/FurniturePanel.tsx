@@ -3,6 +3,7 @@ import { FURNITURE_LIBRARY, FurnitureTemplate } from "../lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   Sofa,
   ChefHat,
@@ -28,9 +29,10 @@ const CATEGORY_ICONS: Record<string, typeof Sofa> = {
 interface FurniturePanelProps {
   onSelectFurniture: (template: FurnitureTemplate) => void;
   onSwitchToSelect?: () => void;
+  className?: string;
 }
 
-export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect }: FurniturePanelProps) {
+export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect, className }: FurniturePanelProps) {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [search, setSearch] = useState("");
 
@@ -59,7 +61,7 @@ export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect }: 
   };
 
   return (
-    <div className="w-60 border-r border-border bg-card flex flex-col" data-testid="furniture-panel">
+    <div className={cn("w-60 border-r border-border bg-card flex flex-col", className)} data-testid="furniture-panel">
       <div className="p-3 border-b border-border">
         <h3 className="text-sm font-semibold mb-2">Items Library</h3>
         <div className="relative">
@@ -79,7 +81,7 @@ export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect }: 
           <Badge
             key={cat}
             variant={selectedCategory === cat ? "default" : "secondary"}
-            className="cursor-pointer text-xs"
+            className="cursor-pointer text-xs py-1.5 px-2.5"
             onClick={() => setSelectedCategory(cat)}
             data-testid={`category-${cat.toLowerCase()}`}
           >
@@ -98,7 +100,7 @@ export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect }: 
                 draggable
                 onDragStart={(e) => handleDragStart(e, template)}
                 onClick={() => onSelectFurniture(template)}
-                className="flex items-center gap-2 px-2.5 py-2 rounded-md cursor-grab active:cursor-grabbing hover-elevate transition-colors"
+                className="flex items-center gap-2 px-2.5 py-2 min-h-[44px] rounded-md cursor-grab active:cursor-grabbing hover-elevate transition-colors"
                 data-testid={`furniture-item-${template.type}`}
               >
                 <GripVertical className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />

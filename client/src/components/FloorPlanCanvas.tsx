@@ -94,9 +94,10 @@ export default function FloorPlanCanvas({
   const [editingLabel, setEditingLabel] = useState<{ id: string | null; x: number; y: number; text: string; isNew: boolean }>({ id: null, x: 0, y: 0, text: "", isNew: false });
   const labelInputRef = useRef<HTMLInputElement>(null);
 
-  // Pinch-to-zoom state
+  // Pinch-to-zoom and two-finger pan state
   const pointerCache = useRef<Map<number, PointerEvent>>(new Map());
   const prevPinchDist = useRef<number | null>(null);
+  const prevPinchCenter = useRef<{ x: number; y: number } | null>(null);
 
   // Canvas resize
   useEffect(() => {
@@ -293,11 +294,15 @@ export default function FloorPlanCanvas({
       // Track pointer for pinch-to-zoom
       pointerCache.current.set(e.pointerId, e.nativeEvent);
       if (pointerCache.current.size === 2) {
-        // Start pinch — compute initial distance
+        // Start pinch — compute initial distance and center
         const pointers = Array.from(pointerCache.current.values());
         const dx = pointers[0].clientX - pointers[1].clientX;
         const dy = pointers[0].clientY - pointers[1].clientY;
         prevPinchDist.current = Math.sqrt(dx * dx + dy * dy);
+        prevPinchCenter.current = {
+          x: (pointers[0].clientX + pointers[1].clientX) / 2,
+          y: (pointers[0].clientY + pointers[1].clientY) / 2,
+        };
         return;
       }
 
@@ -462,7 +467,7 @@ export default function FloorPlanCanvas({
       // Update pointer in cache
       pointerCache.current.set(e.pointerId, e.nativeEvent);
 
-      // Pinch-to-zoom
+      // Pinch-to-zoom + two-finger pan
       if (pointerCache.current.size === 2 && prevPinchDist.current !== null) {
         const pointers = Array.from(pointerCache.current.values());
         const dx = pointers[0].clientX - pointers[1].clientX;
@@ -471,22 +476,28 @@ export default function FloorPlanCanvas({
         const scale = dist / prevPinchDist.current;
         const newZoom = Math.max(0.3, Math.min(3, state.zoom * scale));
 
-        // Zoom towards center of the two pointers
+        // Current center of the two pointers
         const centerX = (pointers[0].clientX + pointers[1].clientX) / 2;
         const centerY = (pointers[0].clientY + pointers[1].clientY) / 2;
+
+        // Two-finger pan delta
+        const panDx = prevPinchCenter.current ? centerX - prevPinchCenter.current.x : 0;
+        const panDy = prevPinchCenter.current ? centerY - prevPinchCenter.current.y : 0;
+
         const canvas = canvasRef.current;
         if (canvas) {
           const rect = canvas.getBoundingClientRect();
           const cx = centerX - rect.left;
           const cy = centerY - rect.top;
           const zoomRatio = newZoom / state.zoom;
-          const newPanX = cx - (cx - state.panOffset.x) * zoomRatio;
-          const newPanY = cy - (cy - state.panOffset.y) * zoomRatio;
+          const newPanX = cx - (cx - state.panOffset.x) * zoomRatio + panDx;
+          const newPanY = cy - (cy - state.panOffset.y) * zoomRatio + panDy;
           onSetZoom(newZoom);
           onSetPan({ x: newPanX, y: newPanY });
         }
 
         prevPinchDist.current = dist;
+        prevPinchCenter.current = { x: centerX, y: centerY };
         return;
       }
 
@@ -628,6 +639,7 @@ export default function FloorPlanCanvas({
       pointerCache.current.delete(e.pointerId);
       if (pointerCache.current.size < 2) {
         prevPinchDist.current = null;
+        prevPinchCenter.current = null;
       }
 
       if (isDragging) {
