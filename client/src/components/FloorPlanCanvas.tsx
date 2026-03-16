@@ -367,15 +367,10 @@ export default function FloorPlanCanvas({
         if (state.wallDrawing) {
           onAddWall(state.wallDrawing.start, finalPoint);
 
-          // Auto-close: if the new endpoint snaps to the chain start, exit drawing
-          if (didSnap && state.wallChainStart) {
-            const dx = finalPoint.x - state.wallChainStart.x;
-            const dy = finalPoint.y - state.wallChainStart.y;
-            if (Math.sqrt(dx * dx + dy * dy) < 1) {
-              onSetWallDrawing(null);
-            } else {
-              onSetWallDrawing({ start: finalPoint });
-            }
+          // Auto-exit: if the new endpoint snaps to ANY existing wall endpoint,
+          // the user has connected to something — exit drawing mode
+          if (didSnap) {
+            onSetWallDrawing(null);
           } else {
             onSetWallDrawing({ start: finalPoint });
           }
