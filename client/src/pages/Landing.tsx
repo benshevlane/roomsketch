@@ -71,13 +71,10 @@ const faqs = [
 
 export default function Landing() {
   const [, navigate] = useLocation();
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [isDark, setIsDark] = useState(false);
-  const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
-    // Respect system preference
     setIsDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
   }, []);
 
@@ -101,6 +98,11 @@ export default function Landing() {
 
   const goToApp = () => navigate("/app");
 
+  const scrollTo = (id: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
     <div className={`min-h-screen font-sans ${isDark ? "bg-[#1a1a18] text-[#f0ede6]" : "bg-[#faf8f4] text-[#1a1a18]"} transition-colors duration-300`}>
 
@@ -112,9 +114,9 @@ export default function Landing() {
             <span className="font-semibold text-[15px] tracking-tight">RoomSketch</span>
           </div>
           <nav className="hidden sm:flex items-center gap-6 text-sm">
-            <a href="#how-it-works" className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>How it works</a>
-            <a href="#features" className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>Features</a>
-            <a href="#faq" className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>FAQ</a>
+            <a href="#how-it-works" onClick={scrollTo("how-it-works")} className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>How it works</a>
+            <a href="#features" onClick={scrollTo("features")} className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>Features</a>
+            <a href="#faq" onClick={scrollTo("faq")} className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>FAQ</a>
           </nav>
           <div className="flex items-center gap-3">
             <button
@@ -159,6 +161,7 @@ export default function Landing() {
             </button>
             <a
               href="#how-it-works"
+              onClick={scrollTo("how-it-works")}
               className={`px-7 py-3 rounded-xl text-base font-medium border transition-colors ${isDark ? "border-[#2e2e2a] hover:bg-[#2e2e2a] text-[#f0ede6]" : "border-[#d8d2c4] hover:bg-[#f0ede6] text-[#1a1a18]"}`}
             >
               See how it works
@@ -178,60 +181,38 @@ export default function Landing() {
             </div>
             {/* Floor plan SVG */}
             <svg viewBox="0 0 480 280" className="w-full" style={{ background: isDark ? "#222220" : "#faf8f4" }}>
-              {/* Grid */}
               <defs>
                 <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
                   <path d="M 20 0 L 0 0 0 20" fill="none" stroke={isDark ? "#2a2a28" : "#e8e3d8"} strokeWidth="0.5"/>
                 </pattern>
               </defs>
               <rect width="480" height="280" fill="url(#grid)"/>
-
-              {/* Room outline */}
               <rect x="60" y="40" width="240" height="180" fill={isDark ? "rgba(61,138,124,0.08)" : "rgba(61,138,124,0.06)"} stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="2.5" rx="1"/>
-
-              {/* Internal wall */}
               <line x1="60" y1="140" x2="180" y2="140" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="2.5"/>
               <line x1="180" y1="140" x2="180" y2="220" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="2.5"/>
-
-              {/* Door arc */}
               <path d="M 180 140 A 24 24 0 0 1 204 140" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1.5" fill="none" strokeDasharray="3 2"/>
               <line x1="180" y1="140" x2="180" y2="116" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
-
-              {/* Sofa */}
               <rect x="80" y="60" width="80" height="36" rx="4" fill={isDark ? "#3a3a36" : "#e8e3d8"} stroke={isDark ? "#5a5a52" : "#c8c0b0"} strokeWidth="1"/>
               <rect x="82" y="62" width="20" height="32" rx="3" fill={isDark ? "#4a4a44" : "#d8d2c0"}/>
               <rect x="138" y="62" width="20" height="32" rx="3" fill={isDark ? "#4a4a44" : "#d8d2c0"}/>
-
-              {/* Coffee table */}
               <rect x="100" y="106" width="40" height="24" rx="3" fill={isDark ? "#4a4a44" : "#d4cebe"} stroke={isDark ? "#5a5a52" : "#b8b0a0"} strokeWidth="1"/>
-
-              {/* Bed */}
               <rect x="200" y="150" width="80" height="55" rx="3" fill={isDark ? "#3a3a36" : "#e8e3d8"} stroke={isDark ? "#5a5a52" : "#c8c0b0"} strokeWidth="1"/>
               <rect x="200" y="150" width="80" height="16" rx="2" fill={isDark ? "#4a4a44" : "#d0cabe"}/>
               <ellipse cx="218" cy="158" rx="9" ry="6" fill={isDark ? "#5a5a52" : "#c0b8a8"}/>
               <ellipse cx="262" cy="158" rx="9" ry="6" fill={isDark ? "#5a5a52" : "#c0b8a8"}/>
-
-              {/* Dimension labels */}
               <text x="170" y="237" textAnchor="middle" fontSize="9" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontFamily="sans-serif">6.00 m</text>
               <line x1="60" y1="233" x2="300" y2="233" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
               <line x1="60" y1="229" x2="60" y2="237" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
               <line x1="300" y1="229" x2="300" y2="237" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
-
               <text x="322" y="130" textAnchor="start" fontSize="9" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontFamily="sans-serif">4.50 m</text>
               <line x1="315" y1="40" x2="315" y2="220" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
               <line x1="311" y1="40" x2="319" y2="40" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
               <line x1="311" y1="220" x2="319" y2="220" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1"/>
-
-              {/* Room labels */}
               <text x="110" y="165" textAnchor="middle" fontSize="10" fill={isDark ? "#a09a8c" : "#6b6457"} fontFamily="sans-serif" fontStyle="italic">Living room</text>
               <text x="246" y="135" textAnchor="middle" fontSize="10" fill={isDark ? "#a09a8c" : "#6b6457"} fontFamily="sans-serif" fontStyle="italic">Bedroom</text>
-
-              {/* Cursor */}
               <circle cx="340" cy="90" r="4" fill={isDark ? "#5ba89a" : "#3d8a7c"} opacity="0.7">
                 <animate attributeName="opacity" values="0.7;0.3;0.7" dur="2s" repeatCount="indefinite"/>
               </circle>
-
-              {/* Toolbar hint on right */}
               <rect x="360" y="50" width="90" height="180" rx="8" fill={isDark ? "#1e1e1c" : "#f0ede6"} stroke={isDark ? "#2e2e2a" : "#d8d2c4"} strokeWidth="1"/>
               <text x="405" y="70" textAnchor="middle" fontSize="8" fill={isDark ? "#a09a8c" : "#6b6457"} fontFamily="sans-serif">Tools</text>
               {["Walls","Select","Eraser","Labels"].map((t, i) => (
@@ -348,34 +329,6 @@ export default function Landing() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* Email capture */}
-      <section className="max-w-xl mx-auto px-5 py-20 text-center">
-        <div className="rs-fade opacity-0 translate-y-4 transition-all duration-700">
-          <h2 className="text-xl font-bold tracking-tight mb-2">Stay in the loop</h2>
-          <p className={`text-sm mb-6 ${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>New features and tips — no spam, unsubscribe any time.</p>
-          {submitted ? (
-            <p className={`text-sm font-medium ${isDark ? "text-[#5ba89a]" : "text-[#3d8a7c]"}`}>Thanks — you're on the list.</p>
-          ) : (
-            <form
-              onSubmit={(e) => { e.preventDefault(); if (email) setSubmitted(true); }}
-              className="flex gap-2 max-w-sm mx-auto"
-            >
-              <input
-                type="email"
-                required
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={`flex-1 px-4 py-2.5 rounded-lg text-sm border outline-none focus:ring-2 focus:ring-[#3d8a7c]/30 ${isDark ? "bg-[#222220] border-[#2e2e2a] text-[#f0ede6] placeholder:text-[#5a5a52]" : "bg-white border-[#d8d2c4] text-[#1a1a18] placeholder:text-[#9a9488]"}`}
-              />
-              <button type="submit" className="px-5 py-2.5 rounded-lg text-sm font-medium bg-[#3d8a7c] hover:bg-[#327368] text-white transition-colors">
-                Subscribe
-              </button>
-            </form>
-          )}
         </div>
       </section>
 
