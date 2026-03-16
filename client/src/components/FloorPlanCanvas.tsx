@@ -94,6 +94,10 @@ export default function FloorPlanCanvas({
   const [editingLabel, setEditingLabel] = useState<{ id: string | null; x: number; y: number; text: string; isNew: boolean }>({ id: null, x: 0, y: 0, text: "", isNew: false });
   const labelInputRef = useRef<HTMLInputElement>(null);
 
+  // Synchronous wall-drawing state to avoid stale closures on rapid mobile taps
+  const wallDrawingRef = useRef(state.wallDrawing);
+  wallDrawingRef.current = state.wallDrawing;
+
   // Pinch-to-zoom and two-finger pan state
   const pointerCache = useRef<Map<number, PointerEvent>>(new Map());
   const prevPinchDist = useRef<number | null>(null);
@@ -405,31 +409,36 @@ export default function FloorPlanCanvas({
         let finalPoint = endpointSnap ? wallSnapped : (bodySnap ? bodySnapped : gridSnapped);
 
         // Apply angle snapping when actively drawing (skip if snapped)
-        if (state.wallDrawing && !didSnap) {
-          const angleResult = snapAngle(state.wallDrawing.start, finalPoint, 15, 5);
+        const currentWallDrawing = wallDrawingRef.current;
+        if (currentWallDrawing && !didSnap) {
+          const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 15, 5);
           finalPoint = angleResult.snapped;
           // Apply grid snap to the angle-snapped point
           finalPoint = snapToGrid(finalPoint, 10);
         }
 
-        if (state.wallDrawing) {
+        if (currentWallDrawing) {
           if (bodySnap && !endpointSnap && bodyWallId) {
             // Snap to wall body: split the existing wall and connect
-            onSplitWallAndConnect(bodyWallId, finalPoint, state.wallDrawing.start);
+            onSplitWallAndConnect(bodyWallId, finalPoint, currentWallDrawing.start);
             onSetWallDrawing(null);
+            wallDrawingRef.current = null;
           } else {
-            onAddWall(state.wallDrawing.start, finalPoint);
+            onAddWall(currentWallDrawing.start, finalPoint);
 
             // Auto-exit: if the new endpoint snaps to ANY existing wall endpoint,
             // the user has connected to something — exit drawing mode
             if (endpointSnap) {
               onSetWallDrawing(null);
+              wallDrawingRef.current = null;
             } else {
               onSetWallDrawing({ start: finalPoint });
+              wallDrawingRef.current = { start: finalPoint };
             }
           }
         } else {
           onSetWallDrawing({ start: finalPoint });
+          wallDrawingRef.current = { start: finalPoint };
         }
       } else if (state.selectedTool === "eraser") {
         const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
@@ -686,8 +695,9 @@ export default function FloorPlanCanvas({
 
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
-      if (state.selectedTool === "wall" && state.wallDrawing) {
+      if (state.selectedTool === "wall" && wallDrawingRef.current) {
         onSetWallDrawing(null);
+        wallDrawingRef.current = null;
         return;
       }
 
