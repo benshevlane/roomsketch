@@ -35,10 +35,20 @@ export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect }: 
   const [search, setSearch] = useState("");
 
   const filtered = FURNITURE_LIBRARY.filter((item) => {
+    const isDoorWindow = item.type === "door" || item.type === "window";
     // When searching, ignore category filter so results span all categories
-    if (!search && selectedCategory !== "All" && item.category !== selectedCategory) return false;
-    if (search && !item.label.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      return item.label.toLowerCase().includes(search.toLowerCase());
+    }
+    // Doors & windows always appear regardless of selected category
+    if (isDoorWindow) return true;
+    if (selectedCategory !== "All" && item.category !== selectedCategory) return false;
     return true;
+  }).sort((a, b) => {
+    // Doors & windows always float to the top of every list
+    const aIsStructure = a.type === "door" || a.type === "window" ? 0 : 1;
+    const bIsStructure = b.type === "door" || b.type === "window" ? 0 : 1;
+    return aIsStructure - bIsStructure;
   });
 
   const handleDragStart = (e: React.DragEvent, template: FurnitureTemplate) => {

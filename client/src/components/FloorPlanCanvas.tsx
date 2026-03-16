@@ -12,6 +12,7 @@ import {
   drawAlignmentGuides,
   drawDistanceMeasurements,
   drawEraserHighlight,
+  hitTestRotateHandle,
   snapAngle,
   computeWallAngle,
   screenToWorld,
@@ -79,6 +80,9 @@ export default function FloorPlanCanvas({
   const [resizeStart, setResizeStart] = useState<{ x: number; y: number; itemX: number; itemY: number; itemW: number; itemH: number } | null>(null);
   const [wallSnapPoint, setWallSnapPoint] = useState<Point | null>(null);
   const [eraserHoverId, setEraserHoverId] = useState<string | null>(null);
+  const [isRotating, setIsRotating] = useState(false);
+  const [rotateStartAngle, setRotateStartAngle] = useState(0);
+  const [rotateItemStartRot, setRotateItemStartRot] = useState(0);
 
   // Inline label editing state
   const [editingLabel, setEditingLabel] = useState<{ id: string | null; x: number; y: number; text: string; isNew: boolean }>({ id: null, x: 0, y: 0, text: "", isNew: false });
@@ -164,8 +168,13 @@ export default function FloorPlanCanvas({
       }
     }
 
-    // Furniture
-    drawFurniture(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
+    // Furniture — draw non-door/window items first
+    const regularFurniture = state.furniture.filter((f) => f.type !== "door" && f.type !== "window");
+    drawFurniture(ctx, regularFurniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
+
+    // Doors & windows render on top of walls so they overlay correctly
+    const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "window");
+    drawFurniture(ctx, doorWindowItems, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
     // Resize handles and distance measurements for selected furniture
     const selectedFurn = state.furniture.find((f) => f.id === state.selectedItemId);
@@ -298,9 +307,20 @@ export default function FloorPlanCanvas({
       if (!ctx) return;
 
       if (state.selectedTool === "select") {
-        // Check resize handles first
+        // Check rotation handle first, then resize handles
         const selectedFurn = state.furniture.find((f) => f.id === state.selectedItemId);
         if (selectedFurn) {
+          if (hitTestRotateHandle(pos.x, pos.y, selectedFurn, state.gridSize, state.zoom, state.panOffset)) {
+            const pxPerCm = (state.gridSize * state.zoom) / 100;
+            const centerX = selectedFurn.x * pxPerCm + (selectedFurn.width * pxPerCm) / 2 + state.panOffset.x;
+            const centerY = selectedFurn.y * pxPerCm + (selectedFurn.height * pxPerCm) / 2 + state.panOffset.y;
+            const startAngle = Math.atan2(pos.y - centerY, pos.x - centerX);
+            setIsRotating(true);
+            setRotateStartAngle(startAngle);
+            setRotateItemStartRot(selectedFurn.rotation);
+            onPushUndo();
+            return;
+          }
           const corner = hitTestResizeHandle(pos.x, pos.y, selectedFurn, state.gridSize, state.zoom, state.panOffset);
           if (corner) {
             setIsResizing(true);
@@ -449,6 +469,27 @@ export default function FloorPlanCanvas({
         return;
       }
 
+      // Handle free rotation
+      if (isRotating && state.selectedItemId) {
+        const furn = state.furniture.find((f) => f.id === state.selectedItemId);
+        if (furn) {
+          const pxPerCm = (state.gridSize * state.zoom) / 100;
+          const centerX = furn.x * pxPerCm + (furn.width * pxPerCm) / 2 + state.panOffset.x;
+          const centerY = furn.y * pxPerCm + (furn.height * pxPerCm) / 2 + state.panOffset.y;
+          const currentAngle = Math.atan2(pos.y - centerY, pos.x - centerX);
+          let deltaDeg = ((currentAngle - rotateStartAngle) * 180) / Math.PI;
+          let newRot = rotateItemStartRot + deltaDeg;
+          // Snap to 15° increments when within 3° threshold
+          const snapDeg = 15;
+          const nearestSnap = Math.round(newRot / snapDeg) * snapDeg;
+          if (Math.abs(newRot - nearestSnap) < 3) newRot = nearestSnap;
+          // Normalize to 0-360
+          newRot = ((newRot % 360) + 360) % 360;
+          onUpdateFurniture(state.selectedItemId, { rotation: Math.round(newRot) });
+        }
+        return;
+      }
+
       if (isResizing && resizeStart && resizeCorner && state.selectedItemId) {
         const pxPerCm = (state.gridSize * state.zoom) / 100;
         const dxPx = pos.x - resizeStart.x;
@@ -540,7 +581,7 @@ export default function FloorPlanCanvas({
         setEraserHoverId(null);
       }
     },
-    [state, isPanning, isDragging, isResizing, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture]
+    [state, isPanning, isDragging, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture]
   );
 
   const handlePointerUp = useCallback(
@@ -556,6 +597,7 @@ export default function FloorPlanCanvas({
       setIsDragging(false);
       setIsPanning(false);
       setIsResizing(false);
+      setIsRotating(false);
       setResizeCorner(null);
       setResizeStart(null);
     },
@@ -701,6 +743,7 @@ export default function FloorPlanCanvas({
 
   const cursorStyle = (() => {
     if (isPanning) return "grabbing";
+    if (isRotating) return "grab";
     if (isResizing) return "nwse-resize";
     if (state.selectedTool === "pan") return "grab";
     if (state.selectedTool === "wall") return "crosshair";

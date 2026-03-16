@@ -919,7 +919,74 @@ export function drawResizeHandles(
     );
   }
 
+  // Rotation handle — circle above top edge
+  const rotHandleDist = 24;
+  ctx.beginPath();
+  // Line from top-center to handle
+  ctx.strokeStyle = "#01696f";
+  ctx.lineWidth = 1.5;
+  ctx.moveTo(0, -h / 2);
+  ctx.lineTo(0, -h / 2 - rotHandleDist);
+  ctx.stroke();
+  // Circle handle
+  ctx.beginPath();
+  ctx.arc(0, -h / 2 - rotHandleDist, 7, 0, Math.PI * 2);
+  ctx.fillStyle = "#01696f";
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Rotation arrow icon inside
+  ctx.beginPath();
+  ctx.arc(0, -h / 2 - rotHandleDist, 4, -Math.PI * 0.8, Math.PI * 0.4);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Arrowhead
+  const arrowAngle = Math.PI * 0.4;
+  const ax = 4 * Math.cos(arrowAngle);
+  const ay = 4 * Math.sin(arrowAngle);
+  ctx.beginPath();
+  ctx.moveTo(ax, -h / 2 - rotHandleDist + ay);
+  ctx.lineTo(ax + 3, -h / 2 - rotHandleDist + ay - 2);
+  ctx.moveTo(ax, -h / 2 - rotHandleDist + ay);
+  ctx.lineTo(ax - 1, -h / 2 - rotHandleDist + ay - 3);
+  ctx.stroke();
+
   ctx.restore();
+}
+
+/** Hit-test the rotation handle circle above a selected furniture item */
+export function hitTestRotateHandle(
+  screenX: number,
+  screenY: number,
+  item: FurnitureItem,
+  gridSize: number,
+  zoom: number,
+  panOffset: Point
+): boolean {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const x = item.x * pxPerCm + panOffset.x;
+  const y = item.y * pxPerCm + panOffset.y;
+  const w = item.width * pxPerCm;
+  const h = item.height * pxPerCm;
+  const rotHandleDist = 24;
+
+  // Handle center in rotated coords is at (0, -h/2 - rotHandleDist)
+  // Transform that to screen coords
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const angle = (item.rotation * Math.PI) / 180;
+  // Local handle position
+  const lhx = 0;
+  const lhy = -h / 2 - rotHandleDist;
+  // Rotate to screen
+  const shx = cx + lhx * Math.cos(angle) - lhy * Math.sin(angle);
+  const shy = cy + lhx * Math.sin(angle) + lhy * Math.cos(angle);
+
+  const dx = screenX - shx;
+  const dy = screenY - shy;
+  return Math.sqrt(dx * dx + dy * dy) <= 14; // generous hit area
 }
 
 export function hitTestResizeHandle(
