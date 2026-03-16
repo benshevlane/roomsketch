@@ -6,11 +6,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Editor from "@/pages/Editor";
+import Landing from "@/pages/Landing";
 
 function AppRouter() {
   return (
     <Switch>
-      <Route path="/" component={Editor} />
+      <Route path="/" component={Landing} />
+      <Route path="/app" component={Editor} />
       <Route component={NotFound} />
     </Switch>
   );
