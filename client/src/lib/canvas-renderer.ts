@@ -64,6 +64,99 @@ export function drawGrid(
   ctx.stroke();
 }
 
+/**
+ * Find groups of collinear walls (same direction, sharing endpoints)
+ * and return merged measurement info so we show one combined label.
+ */
+function findCollinearGroups(walls: Wall[]): Map<string, { totalLengthCm: number; wallIds: Set<string>; minP: Point; maxP: Point }> {
+  // Build adjacency: for each endpoint, find walls connected there
+  const groups = new Map<string, { totalLengthCm: number; wallIds: Set<string>; minP: Point; maxP: Point }>();
+
+  // Helper: compute normalized direction (unit vector or close)
+  function wallDir(w: Wall): { dx: number; dy: number } {
+    const dx = w.end.x - w.start.x;
+    const dy = w.end.y - w.start.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.01) return { dx: 0, dy: 0 };
+    return { dx: dx / len, dy: dy / len };
+  }
+
+  // Check if two walls are collinear (same line, shared endpoint)
+  function areCollinear(a: Wall, b: Wall): boolean {
+    const da = wallDir(a);
+    const db = wallDir(b);
+    // Directions must be parallel (dot product of normals ~ 0 means same line)
+    const cross = Math.abs(da.dx * db.dy - da.dy * db.dx);
+    if (cross > 0.01) return false; // not parallel
+
+    // Must share an endpoint
+    const eps = 0.5;
+    const shareEndpoint =
+      (Math.abs(a.end.x - b.start.x) < eps && Math.abs(a.end.y - b.start.y) < eps) ||
+      (Math.abs(a.start.x - b.end.x) < eps && Math.abs(a.start.y - b.end.y) < eps) ||
+      (Math.abs(a.start.x - b.start.x) < eps && Math.abs(a.start.y - b.start.y) < eps) ||
+      (Math.abs(a.end.x - b.end.x) < eps && Math.abs(a.end.y - b.end.y) < eps);
+    return shareEndpoint;
+  }
+
+  // Union-find to group collinear connected walls
+  const parent = new Map<string, string>();
+  function find(id: string): string {
+    if (!parent.has(id)) parent.set(id, id);
+    if (parent.get(id) !== id) parent.set(id, find(parent.get(id)!));
+    return parent.get(id)!;
+  }
+  function union(a: string, b: string) {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  }
+
+  for (let i = 0; i < walls.length; i++) {
+    for (let j = i + 1; j < walls.length; j++) {
+      if (areCollinear(walls[i], walls[j])) {
+        union(walls[i].id, walls[j].id);
+      }
+    }
+  }
+
+  // Build groups
+  const groupMap = new Map<string, Wall[]>();
+  for (const w of walls) {
+    const root = find(w.id);
+    if (!groupMap.has(root)) groupMap.set(root, []);
+    groupMap.get(root)!.push(w);
+  }
+
+  // For groups with 2+ walls, compute merged info
+  for (const [root, wallList] of groupMap) {
+    if (wallList.length < 2) continue;
+
+    // Collect all points, find the two extreme points along the line
+    const points: Point[] = [];
+    const wallIds = new Set<string>();
+    for (const w of wallList) {
+      points.push(w.start, w.end);
+      wallIds.add(w.id);
+    }
+
+    // Project all points onto the wall direction to find min/max
+    const dir = wallDir(wallList[0]);
+    let minProj = Infinity, maxProj = -Infinity;
+    let minP = points[0], maxP = points[0];
+    for (const p of points) {
+      const proj = p.x * dir.dx + p.y * dir.dy;
+      if (proj < minProj) { minProj = proj; minP = p; }
+      if (proj > maxProj) { maxProj = proj; maxP = p; }
+    }
+
+    const totalLengthCm = Math.sqrt((maxP.x - minP.x) ** 2 + (maxP.y - minP.y) ** 2);
+    groups.set(root, { totalLengthCm, wallIds, minP, maxP });
+  }
+
+  return groups;
+}
+
 export function drawWalls(
   ctx: CanvasRenderingContext2D,
   walls: Wall[],
@@ -75,6 +168,14 @@ export function drawWalls(
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
+  // Find collinear wall groups for merged labels
+  const collinearGroups = findCollinearGroups(walls);
+  const mergedWallIds = new Set<string>();
+  for (const group of collinearGroups.values()) {
+    for (const id of group.wallIds) mergedWallIds.add(id);
+  }
+
+  // Draw all wall lines
   walls.forEach((wall) => {
     const sx = wall.start.x * pxPerCm + panOffset.x;
     const sy = wall.start.y * pxPerCm + panOffset.y;
@@ -91,66 +192,91 @@ export function drawWalls(
     ctx.moveTo(sx, sy);
     ctx.lineTo(ex, ey);
     ctx.stroke();
+  });
 
-    // Dimension label
+  // Draw individual labels for non-merged walls
+  walls.forEach((wall) => {
+    if (mergedWallIds.has(wall.id)) return; // will be labeled by group
+
+    const sx = wall.start.x * pxPerCm + panOffset.x;
+    const sy = wall.start.y * pxPerCm + panOffset.y;
+    const ex = wall.end.x * pxPerCm + panOffset.x;
+    const ey = wall.end.y * pxPerCm + panOffset.y;
+
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
     const lengthCm = Math.sqrt(dx * dx + dy * dy);
     if (lengthCm > 10) {
-      const lengthM = (lengthCm / 100).toFixed(2);
-      const mx = (sx + ex) / 2;
-      const my = (sy + ey) / 2;
-      const angle = Math.atan2(ey - sy, ex - sx);
-      const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
-
-      // Measure text width to decide placement strategy
-      const baseFontSize = Math.max(11, 12 * zoom);
-      const text = `${lengthM}m`;
-      ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-      const textWidth = ctx.measureText(text).width;
-      const pad = 4;
-
-      ctx.save();
-      ctx.translate(mx, my);
-      let textAngle = angle;
-      if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
-        textAngle += Math.PI;
-      }
-      ctx.rotate(textAngle);
-
-      if (textWidth + pad * 2 < wallLengthPx - 4) {
-        // Label fits inside the wall — draw centered on wall
-        ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
-        ctx.fillRect(
-          -textWidth / 2 - pad,
-          -8 * zoom - pad,
-          textWidth + pad * 2,
-          16 * zoom + pad
-        );
-        ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(text, 0, 0);
-      } else if (wallLengthPx > 15) {
-        // Label doesn't fit — draw offset above/outside the wall
-        const offsetY = -(wall.thickness * pxPerCm / 2) - baseFontSize - 2;
-        ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
-        ctx.fillRect(
-          -textWidth / 2 - pad,
-          offsetY - baseFontSize * 0.4 - pad,
-          textWidth + pad * 2,
-          baseFontSize + pad * 2
-        );
-        ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(text, 0, offsetY);
-      }
-      // else: wall too tiny to label at all
-
-      ctx.restore();
+      drawWallDimensionLabel(ctx, sx, sy, ex, ey, lengthCm, wall.thickness * pxPerCm, zoom, isDark);
     }
   });
+
+  // Draw merged labels for collinear groups
+  for (const group of collinearGroups.values()) {
+    const sx = group.minP.x * pxPerCm + panOffset.x;
+    const sy = group.minP.y * pxPerCm + panOffset.y;
+    const ex = group.maxP.x * pxPerCm + panOffset.x;
+    const ey = group.maxP.y * pxPerCm + panOffset.y;
+    const thickness = walls[0]?.thickness ?? 15;
+    drawWallDimensionLabel(ctx, sx, sy, ex, ey, group.totalLengthCm, thickness * pxPerCm, zoom, isDark);
+  }
+}
+
+/** Shared helper to draw a wall dimension label */
+function drawWallDimensionLabel(
+  ctx: CanvasRenderingContext2D,
+  sx: number, sy: number, ex: number, ey: number,
+  lengthCm: number, wallThicknessPx: number,
+  zoom: number, isDark: boolean
+) {
+  const lengthM = (lengthCm / 100).toFixed(2);
+  const mx = (sx + ex) / 2;
+  const my = (sy + ey) / 2;
+  const angle = Math.atan2(ey - sy, ex - sx);
+  const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
+
+  const baseFontSize = Math.max(11, 12 * zoom);
+  const text = `${lengthM}m`;
+  ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+  const textWidth = ctx.measureText(text).width;
+  const pad = 4;
+
+  ctx.save();
+  ctx.translate(mx, my);
+  let textAngle = angle;
+  if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
+    textAngle += Math.PI;
+  }
+  ctx.rotate(textAngle);
+
+  if (textWidth + pad * 2 < wallLengthPx - 4) {
+    ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
+    ctx.fillRect(
+      -textWidth / 2 - pad,
+      -8 * zoom - pad,
+      textWidth + pad * 2,
+      16 * zoom + pad
+    );
+    ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, 0, 0);
+  } else if (wallLengthPx > 15) {
+    const offsetY = -(wallThicknessPx / 2) - baseFontSize - 2;
+    ctx.fillStyle = isDark ? "#1c1b19" : "#f9f8f5";
+    ctx.fillRect(
+      -textWidth / 2 - pad,
+      offsetY - baseFontSize * 0.4 - pad,
+      textWidth + pad * 2,
+      baseFontSize + pad * 2
+    );
+    ctx.fillStyle = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, 0, offsetY);
+  }
+
+  ctx.restore();
 }
 
 export function drawFurniture(
@@ -415,7 +541,8 @@ export function drawWallPreview(
   gridSize: number,
   zoom: number,
   panOffset: Point,
-  isDark: boolean
+  isDark: boolean,
+  angleDeg?: number
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
   const sx = start.x * pxPerCm + panOffset.x;
@@ -448,6 +575,135 @@ export function drawWallPreview(
     ctx.textBaseline = "bottom";
     ctx.fillText(`${lengthM}m`, mx, my - 10);
   }
+
+  // Angle indicator near cursor
+  if (angleDeg !== undefined && lengthCm > 10) {
+    const fontSize = Math.max(10, 11 * zoom);
+    const angleText = `${Math.round(angleDeg)}°`;
+    ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    ctx.fillStyle = isDark ? "rgba(79,152,163,0.7)" : "rgba(1,105,111,0.6)";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(angleText, ex + 14, ey - 14);
+
+    // Small arc at the start point showing the angle
+    const arcRadius = Math.min(30, Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2) * 0.3);
+    if (arcRadius > 8) {
+      const wallAngle = Math.atan2(ey - sy, ex - sx);
+      ctx.beginPath();
+      ctx.arc(sx, sy, arcRadius, 0, wallAngle, wallAngle < 0);
+      ctx.strokeStyle = isDark ? "rgba(79,152,163,0.4)" : "rgba(1,105,111,0.35)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
+      ctx.stroke();
+    }
+  }
+}
+
+/** Draw faint alignment guide lines from existing wall endpoints */
+export function drawAlignmentGuides(
+  ctx: CanvasRenderingContext2D,
+  currentPoint: Point,
+  walls: Wall[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  canvasWidth: number,
+  canvasHeight: number,
+  isDark: boolean,
+  threshold: number = 5 // world cm tolerance
+): { snapX: number | null; snapY: number | null } {
+  const pxPerCm = (gridSize * zoom) / 100;
+  let snapX: number | null = null;
+  let snapY: number | null = null;
+
+  // Collect unique X and Y values from all wall endpoints
+  const xValues = new Set<number>();
+  const yValues = new Set<number>();
+  for (const wall of walls) {
+    xValues.add(wall.start.x);
+    xValues.add(wall.end.x);
+    yValues.add(wall.start.y);
+    yValues.add(wall.end.y);
+  }
+
+  ctx.save();
+  ctx.setLineDash([4, 6]);
+  ctx.lineWidth = 0.5;
+  ctx.strokeStyle = isDark ? "rgba(79,152,163,0.25)" : "rgba(1,105,111,0.2)";
+
+  // Check if cursor aligns with any existing wall endpoint X
+  for (const x of xValues) {
+    if (Math.abs(currentPoint.x - x) < threshold) {
+      const sx = x * pxPerCm + panOffset.x;
+      ctx.beginPath();
+      ctx.moveTo(sx, 0);
+      ctx.lineTo(sx, canvasHeight);
+      ctx.stroke();
+      snapX = x;
+      break;
+    }
+  }
+
+  // Check Y alignment
+  for (const y of yValues) {
+    if (Math.abs(currentPoint.y - y) < threshold) {
+      const sy = y * pxPerCm + panOffset.y;
+      ctx.beginPath();
+      ctx.moveTo(0, sy);
+      ctx.lineTo(canvasWidth, sy);
+      ctx.stroke();
+      snapY = y;
+      break;
+    }
+  }
+
+  ctx.restore();
+  return { snapX, snapY };
+}
+
+/** Snap angle to nearest multiple of snapAngle degrees */
+export function snapAngle(
+  start: Point,
+  end: Point,
+  snapAngleDeg: number = 15,
+  threshold: number = 5 // degrees tolerance
+): { snapped: Point; angle: number; didSnap: boolean } {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1) return { snapped: end, angle: 0, didSnap: false };
+
+  const rawAngle = Math.atan2(dy, dx);
+  const rawDeg = rawAngle * (180 / Math.PI);
+
+  // Find nearest snap angle
+  const nearestSnap = Math.round(rawDeg / snapAngleDeg) * snapAngleDeg;
+  const diff = Math.abs(rawDeg - nearestSnap);
+
+  if (diff < threshold) {
+    const snapRad = nearestSnap * (Math.PI / 180);
+    return {
+      snapped: {
+        x: start.x + len * Math.cos(snapRad),
+        y: start.y + len * Math.sin(snapRad),
+      },
+      angle: nearestSnap,
+      didSnap: true,
+    };
+  }
+
+  return { snapped: end, angle: rawDeg, didSnap: false };
+}
+
+/** Compute wall angle in degrees, normalized to 0-360 for display */
+export function computeWallAngle(start: Point, end: Point): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  // atan2 gives angle from positive X axis; negate Y for screen coords
+  let deg = Math.atan2(-dy, dx) * (180 / Math.PI);
+  if (deg < 0) deg += 360;
+  return deg;
 }
 
 export function screenToWorld(

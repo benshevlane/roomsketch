@@ -9,6 +9,9 @@ import {
   drawRoomAreas,
   drawResizeHandles,
   drawSnapIndicator,
+  drawAlignmentGuides,
+  snapAngle,
+  computeWallAngle,
   screenToWorld,
   snapToGrid,
   snapToWallEndpoints,
@@ -127,13 +130,31 @@ export default function FloorPlanCanvas({
     // Walls
     drawWalls(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
-    // Wall preview with snapping
+    // Wall preview with snapping, angle snap, alignment guides
     if (state.wallDrawing && state.selectedTool === "wall") {
       const worldMouse = screenToWorld(mousePos.x, mousePos.y, state.gridSize, state.zoom, state.panOffset);
       const gridSnapped = snapToGrid(worldMouse, 10);
       const { snapped: wallSnapped, didSnap } = snapToWallEndpoints(gridSnapped, state.walls, 15);
-      const finalPoint = didSnap ? wallSnapped : gridSnapped;
-      drawWallPreview(ctx, state.wallDrawing.start, finalPoint, state.gridSize, state.zoom, state.panOffset, isDark);
+      let finalPoint = didSnap ? wallSnapped : gridSnapped;
+
+      // Angle snapping (15° increments, strong snap) — skip if already snapped to endpoint
+      let angleDeg: number | undefined;
+      if (!didSnap) {
+        const angleResult = snapAngle(state.wallDrawing.start, finalPoint, 15, 5);
+        finalPoint = angleResult.snapped;
+        // Also snap to alignment guides
+        const guideSnap = drawAlignmentGuides(ctx, finalPoint, state.walls, state.gridSize, state.zoom, state.panOffset, w, h, isDark);
+        if (guideSnap.snapX !== null) finalPoint = { ...finalPoint, x: guideSnap.snapX };
+        if (guideSnap.snapY !== null) finalPoint = { ...finalPoint, y: guideSnap.snapY };
+        // Recompute angle after guide snap
+        angleDeg = computeWallAngle(state.wallDrawing.start, finalPoint);
+      } else {
+        // Draw guides even when endpoint-snapped
+        drawAlignmentGuides(ctx, finalPoint, state.walls, state.gridSize, state.zoom, state.panOffset, w, h, isDark);
+        angleDeg = computeWallAngle(state.wallDrawing.start, finalPoint);
+      }
+
+      drawWallPreview(ctx, state.wallDrawing.start, finalPoint, state.gridSize, state.zoom, state.panOffset, isDark, angleDeg);
       if (didSnap) {
         drawSnapIndicator(ctx, wallSnapped, state.gridSize, state.zoom, state.panOffset);
       }
@@ -151,7 +172,7 @@ export default function FloorPlanCanvas({
     // Labels
     drawLabels(ctx, state.labels, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
-    // Snap indicator when drawing walls and not in preview mode
+    // Snap indicator and alignment guides when wall tool is active but not drawing yet
     if (state.selectedTool === "wall" && !state.wallDrawing) {
       const worldMouse = screenToWorld(mousePos.x, mousePos.y, state.gridSize, state.zoom, state.panOffset);
       const gridSnapped = snapToGrid(worldMouse, 10);
@@ -159,6 +180,10 @@ export default function FloorPlanCanvas({
       if (didSnap) {
         const { snapped } = snapToWallEndpoints(gridSnapped, state.walls, 15);
         drawSnapIndicator(ctx, snapped, state.gridSize, state.zoom, state.panOffset);
+      }
+      // Show alignment guides even before drawing starts
+      if (state.walls.length > 0) {
+        drawAlignmentGuides(ctx, gridSnapped, state.walls, state.gridSize, state.zoom, state.panOffset, w, h, isDark);
       }
     }
 
@@ -302,7 +327,15 @@ export default function FloorPlanCanvas({
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
         const gridSnapped = snapToGrid(world, 10);
         const { snapped: wallSnapped, didSnap } = snapToWallEndpoints(gridSnapped, state.walls, 15);
-        const finalPoint = didSnap ? wallSnapped : gridSnapped;
+        let finalPoint = didSnap ? wallSnapped : gridSnapped;
+
+        // Apply angle snapping when actively drawing
+        if (state.wallDrawing && !didSnap) {
+          const angleResult = snapAngle(state.wallDrawing.start, finalPoint, 15, 5);
+          finalPoint = angleResult.snapped;
+          // Apply grid snap to the angle-snapped point
+          finalPoint = snapToGrid(finalPoint, 10);
+        }
 
         if (state.wallDrawing) {
           onAddWall(state.wallDrawing.start, finalPoint);
