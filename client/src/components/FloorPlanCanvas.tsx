@@ -10,11 +10,13 @@ import {
   drawResizeHandles,
   drawSnapIndicator,
   drawAlignmentGuides,
+  drawDistanceMeasurements,
   snapAngle,
   computeWallAngle,
   screenToWorld,
   snapToGrid,
   snapToWallEndpoints,
+  snapFurnitureToWalls,
   hitTestWall,
   hitTestFurniture,
   hitTestLabel,
@@ -163,10 +165,11 @@ export default function FloorPlanCanvas({
     // Furniture
     drawFurniture(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
-    // Resize handles for selected furniture
+    // Resize handles and distance measurements for selected furniture
     const selectedFurn = state.furniture.find((f) => f.id === state.selectedItemId);
     if (selectedFurn && state.selectedTool === "select") {
       drawResizeHandles(ctx, selectedFurn, state.gridSize, state.zoom, state.panOffset);
+      drawDistanceMeasurements(ctx, selectedFurn, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
     }
 
     // Labels
@@ -493,7 +496,10 @@ export default function FloorPlanCanvas({
         // Check if it's furniture or label
         const furn = state.furniture.find((f) => f.id === state.selectedItemId);
         if (furn) {
-          onMoveFurniture(state.selectedItemId, snappedX, snappedY);
+          // Try to snap furniture to wall edges
+          const tempItem = { ...furn, x: snappedX, y: snappedY };
+          const wallSnap = snapFurnitureToWalls(tempItem, state.walls);
+          onMoveFurniture(state.selectedItemId, wallSnap.x, wallSnap.y);
           return;
         }
         const lbl = state.labels.find((l) => l.id === state.selectedItemId);

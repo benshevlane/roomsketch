@@ -636,7 +636,7 @@ export function drawAlignmentGuides(
   canvasWidth: number,
   canvasHeight: number,
   isDark: boolean,
-  threshold: number = 5 // world cm tolerance
+  threshold: number = 8 // world cm tolerance (increased for easier alignment)
 ): { snapX: number | null; snapY: number | null } {
   const pxPerCm = (gridSize * zoom) / 100;
   let snapX: number | null = null;
@@ -653,9 +653,9 @@ export function drawAlignmentGuides(
   }
 
   ctx.save();
-  ctx.setLineDash([4, 6]);
-  ctx.lineWidth = 0.5;
-  ctx.strokeStyle = isDark ? "rgba(79,152,163,0.25)" : "rgba(1,105,111,0.2)";
+  ctx.setLineDash([6, 5]);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = isDark ? "rgba(79,152,163,0.45)" : "rgba(1,105,111,0.35)";
 
   // Check if cursor aligns with any existing wall endpoint X
   for (const x of xValues) {
@@ -993,4 +993,367 @@ export function hitTestLabel(
     }
   }
   return null;
+}
+
+/** Helper: get the AABB of a furniture item (axis-aligned bounding box in world cm) */
+function furnBBox(item: FurnitureItem): { left: number; right: number; top: number; bottom: number } {
+  return {
+    left: item.x,
+    right: item.x + item.width,
+    top: item.y,
+    bottom: item.y + item.height,
+  };
+}
+
+/** Helper: point-to-segment distance and closest point */
+function pointToSegDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): { dist: number; closest: Point } {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 0.01) return { dist: Math.sqrt((px - ax) ** 2 + (py - ay) ** 2), closest: { x: ax, y: ay } };
+  let t = ((px - ax) * dx + (py - ay) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const cx = ax + t * dx;
+  const cy = ay + t * dy;
+  return { dist: Math.sqrt((px - cx) ** 2 + (py - cy) ** 2), closest: { x: cx, y: cy } };
+}
+
+/** Find minimum perpendicular distance from each edge of a furniture item to each wall segment */
+function computeEdgeToWallDistances(
+  item: FurnitureItem,
+  walls: Wall[]
+): { dist: number; furnitureEdgePt: Point; wallPt: Point; axis: "h" | "v" }[] {
+  const bb = furnBBox(item);
+  const results: { dist: number; furnitureEdgePt: Point; wallPt: Point; axis: "h" | "v" }[] = [];
+
+  // For each wall, compute shortest distance from each furniture edge (as a line) to the wall
+  for (const wall of walls) {
+    const ws = wall.start;
+    const we = wall.end;
+    // Wall direction
+    const wdx = we.x - ws.x;
+    const wdy = we.y - ws.y;
+    const wlen = Math.sqrt(wdx * wdx + wdy * wdy);
+    if (wlen < 1) continue;
+
+    // Check horizontal wall (nearly horizontal => measure vertical distance)
+    const isHorizontal = Math.abs(wdy / wlen) < 0.15;
+    // Check vertical wall (nearly vertical => measure horizontal distance)
+    const isVertical = Math.abs(wdx / wlen) < 0.15;
+
+    if (isHorizontal) {
+      // Wall is roughly horizontal: check distance from furniture top/bottom edges
+      const wallY = (ws.y + we.y) / 2;
+      const wallMinX = Math.min(ws.x, we.x);
+      const wallMaxX = Math.max(ws.x, we.x);
+      const halfThick = wall.thickness / 2;
+
+      // Check overlap in X range
+      if (bb.right > wallMinX && bb.left < wallMaxX) {
+        const midX = Math.max(bb.left, wallMinX) + (Math.min(bb.right, wallMaxX) - Math.max(bb.left, wallMinX)) / 2;
+        // Top edge to wall
+        const distTop = Math.abs(bb.top - wallY) - halfThick;
+        if (distTop > 0 && distTop < 300) {
+          results.push({
+            dist: distTop,
+            furnitureEdgePt: { x: midX, y: bb.top },
+            wallPt: { x: midX, y: bb.top > wallY ? wallY + halfThick : wallY - halfThick },
+            axis: "v",
+          });
+        }
+        // Bottom edge to wall
+        const distBottom = Math.abs(bb.bottom - wallY) - halfThick;
+        if (distBottom > 0 && distBottom < 300) {
+          results.push({
+            dist: distBottom,
+            furnitureEdgePt: { x: midX, y: bb.bottom },
+            wallPt: { x: midX, y: bb.bottom > wallY ? wallY + halfThick : wallY - halfThick },
+            axis: "v",
+          });
+        }
+      }
+    }
+
+    if (isVertical) {
+      // Wall is roughly vertical: check distance from furniture left/right edges
+      const wallX = (ws.x + we.x) / 2;
+      const wallMinY = Math.min(ws.y, we.y);
+      const wallMaxY = Math.max(ws.y, we.y);
+      const halfThick = wall.thickness / 2;
+
+      // Check overlap in Y range
+      if (bb.bottom > wallMinY && bb.top < wallMaxY) {
+        const midY = Math.max(bb.top, wallMinY) + (Math.min(bb.bottom, wallMaxY) - Math.max(bb.top, wallMinY)) / 2;
+        // Left edge to wall
+        const distLeft = Math.abs(bb.left - wallX) - halfThick;
+        if (distLeft > 0 && distLeft < 300) {
+          results.push({
+            dist: distLeft,
+            furnitureEdgePt: { x: bb.left, y: midY },
+            wallPt: { x: bb.left > wallX ? wallX + halfThick : wallX - halfThick, y: midY },
+            axis: "h",
+          });
+        }
+        // Right edge to wall
+        const distRight = Math.abs(bb.right - wallX) - halfThick;
+        if (distRight > 0 && distRight < 300) {
+          results.push({
+            dist: distRight,
+            furnitureEdgePt: { x: bb.right, y: midY },
+            wallPt: { x: bb.right > wallX ? wallX + halfThick : wallX - halfThick, y: midY },
+            axis: "h",
+          });
+        }
+      }
+    }
+  }
+
+  return results;
+}
+
+/** Compute distances between selected furniture and nearby furniture */
+function computeFurnitureToFurnitureDistances(
+  selected: FurnitureItem,
+  others: FurnitureItem[]
+): { dist: number; fromPt: Point; toPt: Point; axis: "h" | "v" }[] {
+  const bb = furnBBox(selected);
+  const results: { dist: number; fromPt: Point; toPt: Point; axis: "h" | "v" }[] = [];
+
+  for (const other of others) {
+    if (other.id === selected.id) continue;
+    const ob = furnBBox(other);
+
+    // Horizontal distance (left/right): check Y overlap
+    const yOverlap = Math.min(bb.bottom, ob.bottom) - Math.max(bb.top, ob.top);
+    if (yOverlap > 5) {
+      const midY = Math.max(bb.top, ob.top) + yOverlap / 2;
+      // Selected is to the right of other
+      if (bb.left >= ob.right) {
+        const d = bb.left - ob.right;
+        if (d > 0 && d < 300) {
+          results.push({ dist: d, fromPt: { x: bb.left, y: midY }, toPt: { x: ob.right, y: midY }, axis: "h" });
+        }
+      }
+      // Selected is to the left of other
+      if (ob.left >= bb.right) {
+        const d = ob.left - bb.right;
+        if (d > 0 && d < 300) {
+          results.push({ dist: d, fromPt: { x: bb.right, y: midY }, toPt: { x: ob.left, y: midY }, axis: "h" });
+        }
+      }
+    }
+
+    // Vertical distance (top/bottom): check X overlap
+    const xOverlap = Math.min(bb.right, ob.right) - Math.max(bb.left, ob.left);
+    if (xOverlap > 5) {
+      const midX = Math.max(bb.left, ob.left) + xOverlap / 2;
+      // Selected is below other
+      if (bb.top >= ob.bottom) {
+        const d = bb.top - ob.bottom;
+        if (d > 0 && d < 300) {
+          results.push({ dist: d, fromPt: { x: midX, y: bb.top }, toPt: { x: midX, y: ob.bottom }, axis: "v" });
+        }
+      }
+      // Selected is above other
+      if (ob.top >= bb.bottom) {
+        const d = ob.top - bb.bottom;
+        if (d > 0 && d < 300) {
+          results.push({ dist: d, fromPt: { x: midX, y: bb.bottom }, toPt: { x: midX, y: ob.top }, axis: "v" });
+        }
+      }
+    }
+  }
+
+  return results;
+}
+
+/** Draw distance measurement lines from selected furniture to nearby walls and objects */
+export function drawDistanceMeasurements(
+  ctx: CanvasRenderingContext2D,
+  selectedItem: FurnitureItem,
+  walls: Wall[],
+  furniture: FurnitureItem[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  units: UnitSystem = "metric"
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const color = isDark ? "#e8894a" : "#d06220";
+
+  // Gather all distances
+  const wallDists = computeEdgeToWallDistances(selectedItem, walls);
+  const furnDists = computeFurnitureToFurnitureDistances(selectedItem, furniture);
+  const allDists = [...wallDists, ...furnDists.map(d => ({ dist: d.dist, furnitureEdgePt: d.fromPt, wallPt: d.toPt, axis: d.axis }))]; 
+
+  // Keep only the closest distance per axis direction (up to 2 horizontal, 2 vertical)
+  const hDists = allDists.filter(d => d.axis === "h").sort((a, b) => a.dist - b.dist).slice(0, 2);
+  const vDists = allDists.filter(d => d.axis === "v").sort((a, b) => a.dist - b.dist).slice(0, 2);
+  const toDraw = [...hDists, ...vDists];
+
+  ctx.save();
+  for (const d of toDraw) {
+    const sx = d.furnitureEdgePt.x * pxPerCm + panOffset.x;
+    const sy = d.furnitureEdgePt.y * pxPerCm + panOffset.y;
+    const ex = d.wallPt.x * pxPerCm + panOffset.x;
+    const ey = d.wallPt.y * pxPerCm + panOffset.y;
+
+    // Dimension line
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // End ticks
+    const tickLen = 5;
+    if (d.axis === "h") {
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - tickLen); ctx.lineTo(sx, sy + tickLen);
+      ctx.moveTo(ex, ey - tickLen); ctx.lineTo(ex, ey + tickLen);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(sx - tickLen, sy); ctx.lineTo(sx + tickLen, sy);
+      ctx.moveTo(ex - tickLen, ey); ctx.lineTo(ex + tickLen, ey);
+      ctx.stroke();
+    }
+
+    // Label
+    const text = formatLength(d.dist, units);
+    const fontSize = Math.max(10, 11 * zoom);
+    ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const textW = ctx.measureText(text).width;
+    const mx = (sx + ex) / 2;
+    const my = (sy + ey) / 2;
+
+    // Background
+    const pad = 3;
+    ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.85)" : "rgba(247, 246, 242, 0.85)";
+    ctx.fillRect(mx - textW / 2 - pad, my - fontSize / 2 - pad, textW + pad * 2, fontSize + pad * 2);
+
+    ctx.fillStyle = color;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, mx, my);
+  }
+  ctx.restore();
+}
+
+/** Snap furniture position to wall edges. Returns adjusted {x, y} if a snap occurred. */
+export function snapFurnitureToWalls(
+  item: FurnitureItem,
+  walls: Wall[],
+  threshold: number = 12 // cm tolerance for snapping
+): { x: number; y: number; didSnap: boolean } {
+  let { x, y } = item;
+  let didSnap = false;
+  const bb = { left: x, right: x + item.width, top: y, bottom: y + item.height };
+
+  for (const wall of walls) {
+    const ws = wall.start;
+    const we = wall.end;
+    const wdx = we.x - ws.x;
+    const wdy = we.y - ws.y;
+    const wlen = Math.sqrt(wdx * wdx + wdy * wdy);
+    if (wlen < 1) continue;
+
+    const halfThick = wall.thickness / 2;
+    const isHorizontal = Math.abs(wdy / wlen) < 0.15;
+    const isVertical = Math.abs(wdx / wlen) < 0.15;
+
+    if (isHorizontal) {
+      const wallY = (ws.y + we.y) / 2;
+      const wallMinX = Math.min(ws.x, we.x);
+      const wallMaxX = Math.max(ws.x, we.x);
+      // Check X overlap
+      if (bb.right > wallMinX && bb.left < wallMaxX) {
+        const wallTopEdge = wallY - halfThick;
+        const wallBottomEdge = wallY + halfThick;
+        // Snap furniture bottom to wall top edge
+        if (Math.abs(bb.bottom - wallTopEdge) < threshold) {
+          y = wallTopEdge - item.height;
+          didSnap = true;
+        }
+        // Snap furniture top to wall bottom edge
+        if (Math.abs(bb.top - wallBottomEdge) < threshold) {
+          y = wallBottomEdge;
+          didSnap = true;
+        }
+        // Snap furniture top to wall top edge
+        if (Math.abs(bb.top - wallTopEdge) < threshold) {
+          y = wallTopEdge;
+          didSnap = true;
+        }
+        // Snap furniture bottom to wall bottom edge
+        if (Math.abs(bb.bottom - wallBottomEdge) < threshold) {
+          y = wallBottomEdge - item.height;
+          didSnap = true;
+        }
+      }
+      // Snap furniture edges to wall endpoints (horizontal alignment)
+      if (bb.bottom > wallY - halfThick - threshold && bb.top < wallY + halfThick + threshold) {
+        // Left edge to wall left end
+        if (Math.abs(bb.left - wallMinX) < threshold) {
+          x = wallMinX;
+          didSnap = true;
+        }
+        // Right edge to wall right end
+        if (Math.abs(bb.right - wallMaxX) < threshold) {
+          x = wallMaxX - item.width;
+          didSnap = true;
+        }
+      }
+    }
+
+    if (isVertical) {
+      const wallX = (ws.x + we.x) / 2;
+      const wallMinY = Math.min(ws.y, we.y);
+      const wallMaxY = Math.max(ws.y, we.y);
+      // Check Y overlap
+      if (bb.bottom > wallMinY && bb.top < wallMaxY) {
+        const wallLeftEdge = wallX - halfThick;
+        const wallRightEdge = wallX + halfThick;
+        // Snap furniture right to wall left edge
+        if (Math.abs(bb.right - wallLeftEdge) < threshold) {
+          x = wallLeftEdge - item.width;
+          didSnap = true;
+        }
+        // Snap furniture left to wall right edge
+        if (Math.abs(bb.left - wallRightEdge) < threshold) {
+          x = wallRightEdge;
+          didSnap = true;
+        }
+        // Snap furniture left to wall left edge
+        if (Math.abs(bb.left - wallLeftEdge) < threshold) {
+          x = wallLeftEdge;
+          didSnap = true;
+        }
+        // Snap furniture right to wall right edge
+        if (Math.abs(bb.right - wallRightEdge) < threshold) {
+          x = wallRightEdge - item.width;
+          didSnap = true;
+        }
+      }
+      // Snap furniture edges to wall endpoints (vertical alignment)
+      if (bb.right > wallX - halfThick - threshold && bb.left < wallX + halfThick + threshold) {
+        // Top edge to wall top end
+        if (Math.abs(bb.top - wallMinY) < threshold) {
+          y = wallMinY;
+          didSnap = true;
+        }
+        // Bottom edge to wall bottom end
+        if (Math.abs(bb.bottom - wallMaxY) < threshold) {
+          y = wallMaxY - item.height;
+          didSnap = true;
+        }
+      }
+    }
+  }
+
+  return { x, y, didSnap };
 }
