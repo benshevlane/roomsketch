@@ -99,7 +99,7 @@ export async function exportToPdf(state: EditorState, roomName: string) {
   ctx.font = `400 ${8 * scale}px 'General Sans', sans-serif`;
   ctx.fillStyle = "#bab9b4";
   ctx.textAlign = "center";
-  ctx.fillText("Made with RoomSketch", canvasW / 2, canvasH - 16 * scale);
+  ctx.fillText("Made with roomsketch.io", canvasW / 2, canvasH - 16 * scale);
 
   // Scale indicator
   const scaleBarLen = 100 * pxPerCm; // 1m

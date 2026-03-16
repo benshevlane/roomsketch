@@ -11,6 +11,7 @@ import {
   drawSnapIndicator,
   drawAlignmentGuides,
   drawDistanceMeasurements,
+  drawEraserHighlight,
   snapAngle,
   computeWallAngle,
   screenToWorld,
@@ -77,6 +78,7 @@ export default function FloorPlanCanvas({
   const [resizeCorner, setResizeCorner] = useState<ResizeCorner | null>(null);
   const [resizeStart, setResizeStart] = useState<{ x: number; y: number; itemX: number; itemY: number; itemW: number; itemH: number } | null>(null);
   const [wallSnapPoint, setWallSnapPoint] = useState<Point | null>(null);
+  const [eraserHoverId, setEraserHoverId] = useState<string | null>(null);
 
   // Inline label editing state
   const [editingLabel, setEditingLabel] = useState<{ id: string | null; x: number; y: number; text: string; isNew: boolean }>({ id: null, x: 0, y: 0, text: "", isNew: false });
@@ -188,6 +190,11 @@ export default function FloorPlanCanvas({
       if (state.walls.length > 0) {
         drawAlignmentGuides(ctx, gridSnapped, state.walls, state.gridSize, state.zoom, state.panOffset, w, h, isDark);
       }
+    }
+
+    // Eraser hover highlight
+    if (state.selectedTool === "eraser" && eraserHoverId) {
+      drawEraserHighlight(ctx, eraserHoverId, state.walls, state.furniture, state.labels, state.gridSize, state.zoom, state.panOffset);
     }
 
     // Scale indicator
@@ -515,8 +522,30 @@ export default function FloorPlanCanvas({
         const { snapped, didSnap } = snapToWallEndpoints(gridSnapped, state.walls, 15);
         setWallSnapPoint(didSnap ? snapped : null);
       }
+
+      // Eraser hover detection
+      if (state.selectedTool === "eraser") {
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext("2d");
+        const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
+        if (hitFurn) {
+          setEraserHoverId(hitFurn.id);
+        } else if (ctx) {
+          const hitLbl = hitTestLabel(pos.x, pos.y, state.labels, state.gridSize, state.zoom, state.panOffset, ctx);
+          if (hitLbl) {
+            setEraserHoverId(hitLbl.id);
+          } else {
+            const hitW = hitTestWall(pos.x, pos.y, state.walls, state.gridSize, state.zoom, state.panOffset);
+            setEraserHoverId(hitW ? hitW.id : null);
+          }
+        } else {
+          setEraserHoverId(null);
+        }
+      } else if (eraserHoverId) {
+        setEraserHoverId(null);
+      }
     },
-    [state, isPanning, isDragging, isResizing, resizeStart, resizeCorner, dragStart, dragItemOffset, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture]
+    [state, isPanning, isDragging, isResizing, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture]
   );
 
   const handlePointerUp = useCallback(

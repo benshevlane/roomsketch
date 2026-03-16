@@ -1357,3 +1357,102 @@ export function snapFurnitureToWalls(
 
   return { x, y, didSnap };
 }
+
+/** Draw eraser hover highlight on the item that will be deleted */
+export function drawEraserHighlight(
+  ctx: CanvasRenderingContext2D,
+  hoveredId: string,
+  walls: Wall[],
+  furniture: FurnitureItem[],
+  labels: RoomLabel[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point
+) {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const ERASER_COLOR = "#e53935";
+  const ERASER_FILL = "rgba(229, 57, 53, 0.12)";
+
+  // Check walls
+  const wall = walls.find((w) => w.id === hoveredId);
+  if (wall) {
+    const sx = wall.start.x * pxPerCm + panOffset.x;
+    const sy = wall.start.y * pxPerCm + panOffset.y;
+    const ex = wall.end.x * pxPerCm + panOffset.x;
+    const ey = wall.end.y * pxPerCm + panOffset.y;
+
+    ctx.save();
+    ctx.strokeStyle = ERASER_COLOR;
+    ctx.lineWidth = wall.thickness * pxPerCm + 4;
+    ctx.lineCap = "round";
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+
+    // Red outline on top
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = wall.thickness * pxPerCm + 4;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    return;
+  }
+
+  // Check furniture
+  const item = furniture.find((f) => f.id === hoveredId);
+  if (item) {
+    const x = item.x * pxPerCm + panOffset.x;
+    const y = item.y * pxPerCm + panOffset.y;
+    const w = item.width * pxPerCm;
+    const h = item.height * pxPerCm;
+
+    ctx.save();
+    ctx.translate(x + w / 2, y + h / 2);
+    ctx.rotate((item.rotation * Math.PI) / 180);
+
+    // Red semi-transparent fill
+    ctx.fillStyle = ERASER_FILL;
+    ctx.fillRect(-w / 2 - 3, -h / 2 - 3, w + 6, h + 6);
+
+    // Red dashed border
+    ctx.strokeStyle = ERASER_COLOR;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(-w / 2 - 3, -h / 2 - 3, w + 6, h + 6);
+    ctx.setLineDash([]);
+    ctx.restore();
+    return;
+  }
+
+  // Check labels
+  const label = labels.find((l) => l.id === hoveredId);
+  if (label) {
+    const lx = label.x * pxPerCm + panOffset.x;
+    const ly = label.y * pxPerCm + panOffset.y;
+
+    ctx.save();
+    ctx.font = `600 ${label.fontSize * zoom}px 'General Sans', 'DM Sans', sans-serif`;
+    const tm = ctx.measureText(label.text);
+    const tw = tm.width;
+    const th = label.fontSize * zoom;
+    const pad = 6;
+
+    // Red semi-transparent fill
+    ctx.fillStyle = ERASER_FILL;
+    ctx.fillRect(lx - tw / 2 - pad, ly - th / 2 - pad, tw + pad * 2, th + pad * 2);
+
+    // Red dashed border
+    ctx.strokeStyle = ERASER_COLOR;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(lx - tw / 2 - pad, ly - th / 2 - pad, tw + pad * 2, th + pad * 2);
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+}
