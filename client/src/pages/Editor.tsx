@@ -1,0 +1,406 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useEditor } from "../hooks/use-editor";
+import FloorPlanCanvas from "../components/FloorPlanCanvas";
+import EditorToolbar from "../components/EditorToolbar";
+import FurniturePanel from "../components/FurniturePanel";
+import PropertiesPanel from "../components/PropertiesPanel";
+import RoomSketchLogo from "../components/RoomSketchLogo";
+import { PerplexityAttribution } from "../components/PerplexityAttribution";
+import { FurnitureTemplate, FurnitureItem, RoomLabel, Point } from "../lib/types";
+import { exportToPdf } from "../lib/pdf-export";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sun,
+  Moon,
+  HelpCircle,
+  Keyboard,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+function generateId(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+export default function Editor() {
+  const editor = useEditor();
+  const { state } = editor;
+  const [isDark, setIsDark] = useState(() =>
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
+  const [droppingFurniture, setDroppingFurniture] = useState<FurnitureTemplate | null>(null);
+
+  // Clipboard for copy/paste
+  const clipboardRef = useRef<{ type: "furniture"; data: FurnitureItem } | { type: "label"; data: RoomLabel } | null>(null);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+  }, [isDark]);
+
+  const selectedWall = state.walls.find((w) => w.id === state.selectedItemId) || null;
+  const selectedFurniture = state.furniture.find((f) => f.id === state.selectedItemId) || null;
+  const selectedLabel = state.labels.find((l) => l.id === state.selectedItemId) || null;
+  const hasSelection = !!(selectedWall || selectedFurniture || selectedLabel);
+
+  // Copy/paste/duplicate handlers
+  const handleCopy = useCallback(() => {
+    if (selectedFurniture) {
+      clipboardRef.current = { type: "furniture", data: { ...selectedFurniture } };
+    } else if (selectedLabel) {
+      clipboardRef.current = { type: "label", data: { ...selectedLabel } };
+    }
+  }, [selectedFurniture, selectedLabel]);
+
+  const handlePaste = useCallback(() => {
+    const clip = clipboardRef.current;
+    if (!clip) return;
+    editor.pushUndo();
+    if (clip.type === "furniture") {
+      const newItem: FurnitureItem = {
+        ...clip.data,
+        id: generateId(),
+        x: clip.data.x + 20,
+        y: clip.data.y + 20,
+      };
+      // Use addFurniture-like approach via state
+      editor.state.furniture; // just to reference
+      // We need to directly set state — use importState-like approach
+      // Actually let's use addFurniture with a template-like approach
+      const template: FurnitureTemplate = {
+        type: newItem.type,
+        label: newItem.label,
+        width: newItem.width,
+        height: newItem.height,
+        category: newItem.category,
+        icon: "",
+      };
+      editor.addFurniture(template, { x: newItem.x + newItem.width / 2, y: newItem.y + newItem.height / 2 });
+    } else if (clip.type === "label") {
+      editor.addLabel(clip.data.text, { x: clip.data.x + 20, y: clip.data.y + 20 });
+    }
+  }, [editor]);
+
+  const handleDuplicate = useCallback(() => {
+    if (selectedFurniture) {
+      clipboardRef.current = { type: "furniture", data: { ...selectedFurniture } };
+    } else if (selectedLabel) {
+      clipboardRef.current = { type: "label", data: { ...selectedLabel } };
+    }
+    // Then paste immediately
+    const clip = clipboardRef.current;
+    if (!clip) return;
+    editor.pushUndo();
+    if (clip.type === "furniture") {
+      const template: FurnitureTemplate = {
+        type: clip.data.type,
+        label: (clip.data as FurnitureItem).label,
+        width: (clip.data as FurnitureItem).width,
+        height: (clip.data as FurnitureItem).height,
+        category: (clip.data as FurnitureItem).category,
+        icon: "",
+      };
+      editor.addFurniture(template, {
+        x: (clip.data as FurnitureItem).x + (clip.data as FurnitureItem).width / 2 + 20,
+        y: (clip.data as FurnitureItem).y + (clip.data as FurnitureItem).height / 2 + 20,
+      });
+    } else if (clip.type === "label") {
+      editor.addLabel((clip.data as RoomLabel).text, {
+        x: (clip.data as RoomLabel).x + 20,
+        y: (clip.data as RoomLabel).y + 20,
+      });
+    }
+  }, [selectedFurniture, selectedLabel, editor]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === "v" || e.key === "V") {
+        if (!e.ctrlKey && !e.metaKey) editor.setTool("select");
+      }
+      if (e.key === "w" || e.key === "W") {
+        if (!e.ctrlKey && !e.metaKey) editor.setTool("wall");
+      }
+      if (e.key === "l" || e.key === "L") {
+        if (!e.ctrlKey && !e.metaKey) editor.setTool("label");
+      }
+      if (e.key === "e" || e.key === "E") {
+        if (!e.ctrlKey && !e.metaKey) editor.setTool("eraser");
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) editor.redo();
+        else editor.undo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "y") {
+        e.preventDefault();
+        editor.redo();
+      }
+
+      // Copy/Paste/Duplicate
+      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
+        handleCopy();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "v") {
+        if (clipboardRef.current) {
+          e.preventDefault();
+          handlePaste();
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "d") {
+        e.preventDefault();
+        handleDuplicate();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [editor, handleCopy, handlePaste, handleDuplicate]);
+
+  const handleRotateSelected = useCallback(() => {
+    if (selectedFurniture) editor.rotateFurniture(selectedFurniture.id);
+  }, [selectedFurniture, editor]);
+
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedWall) editor.removeWall(selectedWall.id);
+    if (selectedFurniture) editor.removeFurniture(selectedFurniture.id);
+    if (selectedLabel) editor.removeLabel(selectedLabel.id);
+  }, [selectedWall, selectedFurniture, selectedLabel, editor]);
+
+  const handleExportPdf = useCallback(() => {
+    exportToPdf(state, state.roomName);
+  }, [state]);
+
+  const handleSavePlan = useCallback(() => {
+    const plan = editor.exportState();
+    const json = JSON.stringify(plan, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${state.roomName.replace(/[^a-zA-Z0-9]/g, "_")}_plan.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [editor, state.roomName]);
+
+  const handleLoadPlan = useCallback(() => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const plan = JSON.parse(ev.target?.result as string);
+          if (plan.version && plan.walls && plan.furniture && plan.labels) {
+            editor.importState(plan);
+          }
+        } catch {}
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }, [editor]);
+
+  const handleSelectFurniture = useCallback(
+    (template: FurnitureTemplate) => {
+      // Place at center of visible area
+      const centerWorld = {
+        x: (400 - state.panOffset.x) / ((state.gridSize * state.zoom) / 100),
+        y: (300 - state.panOffset.y) / ((state.gridSize * state.zoom) / 100),
+      };
+      editor.addFurniture(template, centerWorld);
+      editor.setTool("select");
+    },
+    [editor, state]
+  );
+
+  const handleDropFurniture = useCallback(
+    (template: FurnitureTemplate, position: Point) => {
+      editor.addFurniture(template, position);
+      editor.setTool("select");
+    },
+    [editor]
+  );
+
+  const handleUpdateFurniture = useCallback(
+    (id: string, updates: Partial<FurnitureItem>) => {
+      editor.updateFurniture(id, updates);
+    },
+    [editor]
+  );
+
+  return (
+    <div className="h-screen flex flex-col bg-background" data-testid="editor-page">
+      {/* Header */}
+      <header className="flex items-center gap-3 px-4 py-2 border-b border-border bg-card">
+        <RoomSketchLogo size={24} className="text-primary flex-shrink-0" />
+        <span className="text-sm font-semibold tracking-tight">RoomSketch</span>
+        <Separator orientation="vertical" className="h-5" />
+        <Input
+          value={state.roomName}
+          onChange={(e) => editor.setRoomName(e.target.value)}
+          className="h-7 w-48 text-sm border-transparent bg-transparent focus:bg-card"
+          data-testid="room-name-input"
+        />
+        <div className="flex-1" />
+
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button size="icon" variant="ghost" data-testid="btn-help">
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Keyboard Shortcuts</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 text-sm">
+              <ShortcutRow keys="V" action="Select & Move tool" />
+              <ShortcutRow keys="W" action="Draw Walls tool" />
+              <ShortcutRow keys="L" action="Add Label tool" />
+              <ShortcutRow keys="E" action="Eraser tool" />
+              <Separator className="my-2" />
+              <ShortcutRow keys="Ctrl+Z" action="Undo" />
+              <ShortcutRow keys="Ctrl+Y" action="Redo" />
+              <ShortcutRow keys="Ctrl+C" action="Copy selected" />
+              <ShortcutRow keys="Ctrl+V" action="Paste" />
+              <ShortcutRow keys="Ctrl+D" action="Duplicate selected" />
+              <ShortcutRow keys="Del" action="Delete selected" />
+              <ShortcutRow keys="Esc" action="Cancel / Deselect" />
+              <ShortcutRow keys="Scroll" action="Zoom in/out" />
+              <ShortcutRow keys="Alt+Drag" action="Pan canvas" />
+              <ShortcutRow keys="Dbl-click" action="Finish wall chain / Edit label" />
+            </div>
+            <div className="mt-3 pt-3 border-t border-border">
+              <h4 className="text-sm font-medium mb-2">Quick Tips</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>Click to start a wall, click again to place it. Keep clicking to chain walls.</li>
+                <li>Drag items from the library onto the canvas.</li>
+                <li>Drag corner handles to resize selected furniture.</li>
+                <li>Walls that form closed loops automatically show room area.</li>
+                <li>All measurements are in metres and centimetres.</li>
+                <li>Export as PDF to share with builders or contractors.</li>
+                <li>Save/Load plans as JSON to preserve your work.</li>
+              </ul>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => setIsDark(!isDark)}
+          data-testid="btn-theme-toggle"
+        >
+          {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
+      </header>
+
+      {/* Toolbar */}
+      <EditorToolbar
+        selectedTool={state.selectedTool}
+        onSetTool={editor.setTool}
+        onUndo={editor.undo}
+        onRedo={editor.redo}
+        canUndo={editor.canUndo}
+        canRedo={editor.canRedo}
+        onZoomIn={() => editor.setZoom(state.zoom * 1.2)}
+        onZoomOut={() => editor.setZoom(state.zoom / 1.2)}
+        onRotateSelected={handleRotateSelected}
+        onDeleteSelected={handleDeleteSelected}
+        hasSelection={hasSelection}
+        selectionIsFurniture={!!selectedFurniture}
+        onExportPdf={handleExportPdf}
+        onSavePlan={handleSavePlan}
+        onLoadPlan={handleLoadPlan}
+        onClearAll={editor.clearAll}
+        zoom={state.zoom}
+      />
+
+      {/* Main area */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Furniture panel */}
+        <FurniturePanel onSelectFurniture={handleSelectFurniture} />
+
+        {/* Canvas */}
+        <FloorPlanCanvas
+          state={state}
+          isDark={isDark}
+          onAddWall={editor.addWall}
+          onSelectItem={editor.setSelectedItem}
+          onMoveFurniture={editor.moveFurniture}
+          onMoveLabel={editor.moveLabel}
+          onRemoveWall={editor.removeWall}
+          onRemoveFurniture={editor.removeFurniture}
+          onRemoveLabel={editor.removeLabel}
+          onSetZoom={editor.setZoom}
+          onSetPan={editor.setPan}
+          onSetWallDrawing={editor.setWallDrawing}
+          onAddLabel={editor.addLabel}
+          onUpdateLabel={editor.updateLabel}
+          onPushUndo={editor.pushUndo}
+          droppingFurniture={droppingFurniture}
+          onDropFurniture={handleDropFurniture}
+          onUpdateFurniture={handleUpdateFurniture}
+        />
+
+        {/* Properties sidebar */}
+        <div className="w-56 border-l border-border bg-card flex flex-col">
+          <ScrollArea className="flex-1">
+            <PropertiesPanel
+              selectedWall={selectedWall}
+              selectedFurniture={selectedFurniture}
+              selectedLabel={selectedLabel}
+              onRotate={handleRotateSelected}
+              onDelete={handleDeleteSelected}
+              onDuplicate={handleDuplicate}
+              onUpdateFurniture={handleUpdateFurniture}
+            />
+          </ScrollArea>
+
+          {/* Status bar */}
+          <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground space-y-1">
+            <div className="flex justify-between">
+              <span>Walls</span>
+              <span className="font-medium tabular-nums">{state.walls.length}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Items</span>
+              <span className="font-medium tabular-nums">{state.furniture.length}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Labels</span>
+              <span className="font-medium tabular-nums">{state.labels.length}</span>
+            </div>
+          </div>
+
+          {/* Attribution */}
+          <div className="border-t border-border p-2">
+            <PerplexityAttribution />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShortcutRow({ keys, action }: { keys: string; action: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-muted-foreground">{action}</span>
+      <kbd className="px-2 py-0.5 text-xs rounded bg-muted font-mono">{keys}</kbd>
+    </div>
+  );
+}
