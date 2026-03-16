@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useEditor } from "../hooks/use-editor";
+import { useIsMobile } from "../hooks/use-mobile";
 import FloorPlanCanvas from "../components/FloorPlanCanvas";
 import EditorToolbar from "../components/EditorToolbar";
 import FurniturePanel from "../components/FurniturePanel";
@@ -12,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   Sun,
   Moon,
@@ -36,6 +38,7 @@ function generateId(): string {
 export default function Editor() {
   const editor = useEditor();
   const { state } = editor;
+  const isMobile = useIsMobile();
   const [isDark, setIsDark] = useState(() =>
     window.matchMedia("(prefers-color-scheme: dark)").matches
   );
@@ -53,6 +56,8 @@ export default function Editor() {
   }, []);
   const [droppingFurniture, setDroppingFurniture] = useState<FurnitureTemplate | null>(null);
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
+  const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -75,6 +80,14 @@ export default function Editor() {
   const selectedFurniture = state.furniture.find((f) => f.id === state.selectedItemId) || null;
   const selectedLabel = state.labels.find((l) => l.id === state.selectedItemId) || null;
   const hasSelection = !!(selectedWall || selectedFurniture || selectedLabel);
+
+  // Auto-open properties sheet on mobile when something is selected
+  useEffect(() => {
+    if (isMobile) {
+      if (hasSelection) setPropertiesPanelOpen(true);
+      else setPropertiesPanelOpen(false);
+    }
+  }, [isMobile, hasSelection]);
 
   // Copy/paste/duplicate handlers
   const handleCopy = useCallback(() => {
@@ -331,12 +344,12 @@ export default function Editor() {
       {/* Header */}
       <header className="flex items-center gap-3 px-4 py-2 border-b border-border bg-card">
         <RoomSketchLogo size={24} className="text-primary flex-shrink-0" />
-        <span className="text-sm font-semibold tracking-tight">RoomSketch</span>
-        <Separator orientation="vertical" className="h-5" />
+        <span className="text-sm font-semibold tracking-tight hidden md:inline">RoomSketch</span>
+        <Separator orientation="vertical" className="h-5 hidden md:block" />
         <Input
           value={state.roomName}
           onChange={(e) => editor.setRoomName(e.target.value)}
-          className="h-7 w-48 text-sm border-transparent bg-transparent focus:bg-card"
+          className="h-7 w-28 md:w-48 text-sm border-transparent bg-transparent focus:bg-card"
           data-testid="room-name-input"
         />
         <div className="flex-1" />
@@ -349,38 +362,65 @@ export default function Editor() {
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Keyboard Shortcuts</DialogTitle>
+              <DialogTitle>{isMobile ? "Help" : "Keyboard Shortcuts"}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-2 text-sm">
-              <ShortcutRow keys="V" action="Select & Move tool" />
-              <ShortcutRow keys="W" action="Draw Walls tool" />
-              <ShortcutRow keys="L" action="Add Label tool" />
-              <ShortcutRow keys="E" action="Eraser tool" />
-              <Separator className="my-2" />
-              <ShortcutRow keys="Ctrl+Z" action="Undo" />
-              <ShortcutRow keys="Ctrl+Y" action="Redo" />
-              <ShortcutRow keys="Ctrl+C" action="Copy selected" />
-              <ShortcutRow keys="Ctrl+V" action="Paste" />
-              <ShortcutRow keys="Ctrl+D" action="Duplicate selected" />
-              <ShortcutRow keys="Del" action="Delete selected" />
-              <ShortcutRow keys="Esc" action="Cancel / Deselect" />
-              <ShortcutRow keys="Scroll" action="Zoom in/out" />
-              <ShortcutRow keys="H" action="Pan tool" />
-              <ShortcutRow keys="Alt+Drag" action="Pan canvas" />
-              <ShortcutRow keys="Dbl-click" action="Finish wall chain / Edit label" />
-            </div>
-            <div className="mt-3 pt-3 border-t border-border">
-              <h4 className="text-sm font-medium mb-2">Quick Tips</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>Click to start a wall, click again to place it. Keep clicking to chain walls.</li>
-                <li>Drag items from the library onto the canvas.</li>
-                <li>Drag corner handles to resize selected furniture.</li>
-                <li>Walls that form closed loops automatically show room area.</li>
-                <li>Toggle between metres and feet using the unit button in the toolbar.</li>
-                <li>Export as PDF to share with builders or contractors.</li>
-                <li>Save your plan as a PNG image to share.</li>
-              </ul>
-            </div>
+            {isMobile ? (
+              <div className="space-y-3 text-sm">
+                <div>
+                  <h4 className="font-medium mb-2">Touch Gestures</h4>
+                  <ul className="text-muted-foreground space-y-1">
+                    <li>Pinch with two fingers to zoom in/out</li>
+                    <li>Drag with two fingers to pan the canvas</li>
+                    <li>Tap an item on canvas to select it</li>
+                    <li>Tap items in the library to place them</li>
+                    <li>Drag corner handles to resize furniture</li>
+                    <li>Use the Pan tool to drag the canvas with one finger</li>
+                  </ul>
+                </div>
+                <div className="pt-2 border-t border-border">
+                  <h4 className="font-medium mb-2">Quick Tips</h4>
+                  <ul className="text-muted-foreground space-y-1">
+                    <li>Tap to start a wall, tap again to place it. Keep tapping to chain walls.</li>
+                    <li>Walls that form closed loops automatically show room area.</li>
+                    <li>Toggle between metres and feet in the toolbar overflow menu.</li>
+                    <li>Save your plan as a PNG image to share.</li>
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2 text-sm">
+                  <ShortcutRow keys="V" action="Select & Move tool" />
+                  <ShortcutRow keys="W" action="Draw Walls tool" />
+                  <ShortcutRow keys="L" action="Add Label tool" />
+                  <ShortcutRow keys="E" action="Eraser tool" />
+                  <Separator className="my-2" />
+                  <ShortcutRow keys="Ctrl+Z" action="Undo" />
+                  <ShortcutRow keys="Ctrl+Y" action="Redo" />
+                  <ShortcutRow keys="Ctrl+C" action="Copy selected" />
+                  <ShortcutRow keys="Ctrl+V" action="Paste" />
+                  <ShortcutRow keys="Ctrl+D" action="Duplicate selected" />
+                  <ShortcutRow keys="Del" action="Delete selected" />
+                  <ShortcutRow keys="Esc" action="Cancel / Deselect" />
+                  <ShortcutRow keys="Scroll" action="Zoom in/out" />
+                  <ShortcutRow keys="H" action="Pan tool" />
+                  <ShortcutRow keys="Alt+Drag" action="Pan canvas" />
+                  <ShortcutRow keys="Dbl-click" action="Finish wall chain / Edit label" />
+                </div>
+                <div className="mt-3 pt-3 border-t border-border">
+                  <h4 className="text-sm font-medium mb-2">Quick Tips</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>Click to start a wall, click again to place it. Keep clicking to chain walls.</li>
+                    <li>Drag items from the library onto the canvas.</li>
+                    <li>Drag corner handles to resize selected furniture.</li>
+                    <li>Walls that form closed loops automatically show room area.</li>
+                    <li>Toggle between metres and feet using the unit button in the toolbar.</li>
+                    <li>Export as PDF to share with builders or contractors.</li>
+                    <li>Save your plan as a PNG image to share.</li>
+                  </ul>
+                </div>
+              </>
+            )}
           </DialogContent>
         </Dialog>
 
@@ -416,12 +456,51 @@ export default function Editor() {
         onToggleUnits={() => editor.setUnits(state.units === "metric" ? "imperial" : "metric")}
         measureMode={measureMode}
         onToggleMeasureMode={toggleMeasureMode}
+        isMobile={isMobile}
+        onToggleFurniturePanel={() => setFurniturePanelOpen((o) => !o)}
+        onTogglePropertiesPanel={() => setPropertiesPanelOpen((o) => !o)}
       />
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Furniture panel */}
-        <FurniturePanel onSelectFurniture={handleSelectFurniture} onSwitchToSelect={() => editor.setTool("select")} />
+        {isMobile ? (
+          <>
+            {/* Mobile: Furniture panel in a left sheet */}
+            <Sheet open={furniturePanelOpen} onOpenChange={setFurniturePanelOpen}>
+              <SheetContent side="left" className="p-0 w-72">
+                <SheetTitle className="sr-only">Items Library</SheetTitle>
+                <FurniturePanel
+                  className="w-full border-r-0"
+                  onSelectFurniture={(t) => { handleSelectFurniture(t); setFurniturePanelOpen(false); }}
+                  onSwitchToSelect={() => editor.setTool("select")}
+                />
+              </SheetContent>
+            </Sheet>
+
+            {/* Mobile: Properties panel in a right sheet */}
+            <Sheet open={propertiesPanelOpen} onOpenChange={setPropertiesPanelOpen}>
+              <SheetContent side="right" className="p-0 w-64">
+                <SheetTitle className="sr-only">Properties</SheetTitle>
+                <div className="bg-card flex flex-col h-full">
+                  <ScrollArea className="flex-1">
+                    <PropertiesPanel
+                      selectedWall={selectedWall}
+                      selectedFurniture={selectedFurniture}
+                      selectedLabel={selectedLabel}
+                      onRotate={handleRotateSelected}
+                      onDelete={handleDeleteSelected}
+                      onDuplicate={handleDuplicate}
+                      onUpdateFurniture={handleUpdateFurniture}
+                    />
+                  </ScrollArea>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </>
+        ) : (
+          /* Desktop: Furniture panel inline */
+          <FurniturePanel onSelectFurniture={handleSelectFurniture} onSwitchToSelect={() => editor.setTool("select")} />
+        )}
 
         {/* Canvas */}
         <FloorPlanCanvas
@@ -446,41 +525,43 @@ export default function Editor() {
           onUpdateFurniture={handleUpdateFurniture}
         />
 
-        {/* Properties sidebar */}
-        <div className="w-56 border-l border-border bg-card flex flex-col">
-          <ScrollArea className="flex-1">
-            <PropertiesPanel
-              selectedWall={selectedWall}
-              selectedFurniture={selectedFurniture}
-              selectedLabel={selectedLabel}
-              onRotate={handleRotateSelected}
-              onDelete={handleDeleteSelected}
-              onDuplicate={handleDuplicate}
-              onUpdateFurniture={handleUpdateFurniture}
-            />
-          </ScrollArea>
+        {/* Desktop: Properties sidebar */}
+        {!isMobile && (
+          <div className="w-56 border-l border-border bg-card flex flex-col">
+            <ScrollArea className="flex-1">
+              <PropertiesPanel
+                selectedWall={selectedWall}
+                selectedFurniture={selectedFurniture}
+                selectedLabel={selectedLabel}
+                onRotate={handleRotateSelected}
+                onDelete={handleDeleteSelected}
+                onDuplicate={handleDuplicate}
+                onUpdateFurniture={handleUpdateFurniture}
+              />
+            </ScrollArea>
 
-          {/* Status bar */}
-          <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground space-y-1">
-            <div className="flex justify-between">
-              <span>Walls</span>
-              <span className="font-medium tabular-nums">{state.walls.length}</span>
+            {/* Status bar */}
+            <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground space-y-1">
+              <div className="flex justify-between">
+                <span>Walls</span>
+                <span className="font-medium tabular-nums">{state.walls.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Items</span>
+                <span className="font-medium tabular-nums">{state.furniture.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Labels</span>
+                <span className="font-medium tabular-nums">{state.labels.length}</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span>Items</span>
-              <span className="font-medium tabular-nums">{state.furniture.length}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Labels</span>
-              <span className="font-medium tabular-nums">{state.labels.length}</span>
+
+            {/* Attribution */}
+            <div className="border-t border-border p-2">
+              <PerplexityAttribution />
             </div>
           </div>
-
-          {/* Attribution */}
-          <div className="border-t border-border p-2">
-            <PerplexityAttribution />
-          </div>
-        </div>
+        )}
       </div>
       {/* Clear confirmation dialog */}
       <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
