@@ -1,4 +1,4 @@
-import { Wall, FurnitureItem, RoomLabel, TextBox, LabelSize, LabelColor, UnitSystem, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix } from "../lib/types";
+import { Wall, WallType, FurnitureItem, RoomLabel, TextBox, LabelSize, LabelColor, UnitSystem, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -16,6 +16,7 @@ interface PropertiesPanelProps {
   onUpdateFurniture: (id: string, updates: Partial<FurnitureItem>) => void;
   onUpdateLabel: (id: string, updates: Partial<RoomLabel>) => void;
   onUpdateTextBox?: (id: string, updates: Partial<TextBox>) => void;
+  onUpdateWall?: (id: string, updates: Partial<Wall>) => void;
   units: UnitSystem;
 }
 
@@ -60,6 +61,7 @@ export default function PropertiesPanel({
   onUpdateFurniture,
   onUpdateLabel,
   onUpdateTextBox,
+  onUpdateWall,
   units,
 }: PropertiesPanelProps) {
   if (!selectedWall && !selectedFurniture && !selectedLabel && !selectedTextBox) {
@@ -89,6 +91,28 @@ export default function PropertiesPanel({
             <span className="text-muted-foreground ml-5">Thickness:</span>
             <span className="font-medium">{formatDimension(selectedWall.thickness, units)}</span>
           </div>
+          {onUpdateWall && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground ml-5">Wall Type</p>
+              <div className="flex gap-1 ml-5">
+                {(["exterior", "interior"] as WallType[]).map((wt) => (
+                  <Button
+                    key={wt}
+                    size="sm"
+                    variant={(selectedWall.wallType || "exterior") === wt ? "default" : "outline"}
+                    className="flex-1 text-xs min-h-[36px] md:min-h-0 capitalize"
+                    onClick={() => {
+                      const newThickness = wt === "exterior" ? 30 : 15;
+                      onUpdateWall(selectedWall.id, { wallType: wt, thickness: newThickness });
+                    }}
+                    data-testid={`btn-wall-type-${wt}`}
+                  >
+                    {wt}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive w-full mt-2 min-h-[44px] md:min-h-0" data-testid="btn-delete-wall">
           <Trash2 className="h-3.5 w-3.5 mr-1" />
@@ -99,7 +123,7 @@ export default function PropertiesPanel({
   }
 
   if (selectedFurniture) {
-    const isStructural = selectedFurniture.type === "door" || selectedFurniture.type === "window";
+    const isStructural = selectedFurniture.type === "door" || selectedFurniture.type === "door_double" || selectedFurniture.type === "window" || selectedFurniture.type === "radiator";
     const isWallCup = isWallCupboard(selectedFurniture.type);
     const widthLabel = isStructural ? "Length:" : "Width:";
     const heightLabel = isStructural ? "Thickness:" : "Height:";

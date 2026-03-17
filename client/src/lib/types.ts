@@ -3,11 +3,14 @@ export interface Point {
   y: number;
 }
 
+export type WallType = "exterior" | "interior";
+
 export interface Wall {
   id: string;
   start: Point;
   end: Point;
   thickness: number; // in cm
+  wallType?: WallType; // defaults to "exterior" (30cm) when creating new walls
 }
 
 export interface FurnitureItem {
@@ -215,5 +218,10 @@ export const FURNITURE_LIBRARY: FurnitureTemplate[] = [
   { type: "dining_chair", label: "Dining Chair", width: 45, height: 45, category: "Dining", icon: "armchair" },
   // Structure
   { type: "door", label: "Door", width: 90, height: 15, category: "Structure", icon: "door-open" },
+  { type: "door_double", label: "Double Door", width: 150, height: 15, category: "Structure", icon: "door-open" },
   { type: "window", label: "Window", width: 100, height: 15, category: "Structure", icon: "square" },
+  { type: "bay_window", label: "Bay Window", width: 180, height: 60, category: "Structure", icon: "square" },
+  { type: "stairs", label: "Staircase", width: 90, height: 250, category: "Structure", icon: "arrow-up" },
+  { type: "radiator", label: "Radiator", width: 100, height: 15, category: "Structure", icon: "thermometer" },
+  { type: "boiler", label: "Boiler", width: 60, height: 60, category: "Kitchen", icon: "flame" },
 ];

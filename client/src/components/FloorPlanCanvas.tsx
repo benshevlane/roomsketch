@@ -263,7 +263,7 @@ export default function FloorPlanCanvas({
     drawFurniture(ctx, wallCupboards, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
     // Doors & windows render on top of walls so they overlay correctly
-    const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "window");
+    const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
     drawFurniture(ctx, doorWindowItems, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
     // Collect component label positions (without drawing) for collision resolution
@@ -670,7 +670,7 @@ export default function FloorPlanCanvas({
         const dyCm = localDyPx / pxPerCm;
 
         // Doors/windows allow smaller height (thickness) than regular furniture
-        const isStructural = resizingItem && (resizingItem.type === "door" || resizingItem.type === "window");
+        const isStructural = resizingItem && (resizingItem.type === "door" || resizingItem.type === "door_double" || resizingItem.type === "window" || resizingItem.type === "radiator");
         const minW = 20;
         const minH = isStructural ? 5 : 20;
 
@@ -755,7 +755,7 @@ export default function FloorPlanCanvas({
           const wallSnap = snapFurnitureToWalls(tempItem, state.walls);
           onMoveFurniture(state.selectedItemId, wallSnap.x, wallSnap.y);
           // Snap opening thickness to wall thickness
-          const isOpening = furn.type === "door" || furn.type === "window";
+          const isOpening = furn.type === "door" || furn.type === "door_double" || furn.type === "window" || furn.type === "radiator";
           if (isOpening && wallSnap.didSnap && wallSnap.snappedWallThickness != null && furn.height !== wallSnap.snappedWallThickness) {
             onUpdateFurniture(state.selectedItemId, { height: wallSnap.snappedWallThickness });
           }
@@ -1153,7 +1153,7 @@ export default function FloorPlanCanvas({
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
         const snapped = snapToGrid(world, 10);
         // Snap opening thickness to wall thickness on drop
-        const isOpening = template.type === "door" || template.type === "window";
+        const isOpening = template.type === "door" || template.type === "door_double" || template.type === "window" || template.type === "radiator";
         if (isOpening) {
           const tempItem: FurnitureItem = {
             id: "", type: template.type, label: template.label,
