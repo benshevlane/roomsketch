@@ -860,6 +860,9 @@ export function drawMeasurementIndicatorLines(
     const wallMid = { x: (wall.start.x + wall.end.x) / 2, y: (wall.start.y + wall.end.y) / 2 };
 
     let foundRoom = false;
+    // For walls shared between nested rooms, use the largest room to determine
+    // the "inside" direction so that "full" mode measures from the correct (outer) side.
+    let bestRoom: DetectedRoom | null = null;
     for (const room of rooms) {
       // Check if both endpoints of this wall are vertices of this room
       const hasStart = room.vertices.some(v =>
@@ -870,15 +873,19 @@ export function drawMeasurementIndicatorLines(
       );
 
       if (hasStart && hasEnd) {
-        const toCentroid = { x: room.centroid.x - wallMid.x, y: room.centroid.y - wallMid.y };
-        const dot = toCentroid.x * nx + toCentroid.y * ny;
-        if (dot < 0) {
-          insideNx = -nx;
-          insideNy = -ny;
+        if (!bestRoom || room.area > bestRoom.area) {
+          bestRoom = room;
         }
-        foundRoom = true;
-        break;
       }
+    }
+    if (bestRoom) {
+      const toCentroid = { x: bestRoom.centroid.x - wallMid.x, y: bestRoom.centroid.y - wallMid.y };
+      const dot = toCentroid.x * nx + toCentroid.y * ny;
+      if (dot < 0) {
+        insideNx = -nx;
+        insideNy = -ny;
+      }
+      foundRoom = true;
     }
 
     if (!foundRoom) {
@@ -1089,6 +1096,9 @@ function drawWallDimensionLabel(
       const wny = wdx / wlen;
 
       let foundRoom = false;
+      // For walls shared between nested rooms, use the largest room to determine
+      // the "inside" direction so that "full" mode measures from the correct (outer) side.
+      let bestRoom: DetectedRoom | null = null;
       for (const room of rooms) {
         const hasStart = room.vertices.some(v =>
           Math.sqrt((v.x - wall.start.x) ** 2 + (v.y - wall.start.y) ** 2) < 15
@@ -1097,13 +1107,17 @@ function drawWallDimensionLabel(
           Math.sqrt((v.x - wall.end.x) ** 2 + (v.y - wall.end.y) ** 2) < 15
         );
         if (hasStart && hasEnd) {
-          const toCentroid = { x: room.centroid.x - wallMid.x, y: room.centroid.y - wallMid.y };
-          const dot = toCentroid.x * wnx + toCentroid.y * wny;
-          insideNormX = dot >= 0 ? normX : -normX;
-          insideNormY = dot >= 0 ? normY : -normY;
-          foundRoom = true;
-          break;
+          if (!bestRoom || room.area > bestRoom.area) {
+            bestRoom = room;
+          }
         }
+      }
+      if (bestRoom) {
+        const toCentroid = { x: bestRoom.centroid.x - wallMid.x, y: bestRoom.centroid.y - wallMid.y };
+        const dot = toCentroid.x * wnx + toCentroid.y * wny;
+        insideNormX = dot >= 0 ? normX : -normX;
+        insideNormY = dot >= 0 ? normY : -normY;
+        foundRoom = true;
       }
 
       if (!foundRoom && allWalls.length > 0) {
