@@ -620,27 +620,7 @@ export function drawFurniture(
       drawFurnitureDetail(ctx, item.type, w, h, isDark);
     }
 
-    // Label (skip for doors/windows — they use the component label pill instead)
-    if (item.type !== "door" && item.type !== "window") {
-      const fontSize = Math.max(9, Math.min(12 * zoom, w * 0.15));
-      ctx.font = `500 ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
-      ctx.fillStyle = isDark ? "#9a9994" : "#5a5954";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      const label = item.label;
-      if (ctx.measureText(label).width < w - 8) {
-        ctx.fillText(label, 0, 0);
-      }
-
-      // Dimensions below label
-      const dimText = `${item.width}×${item.height}`;
-      const dimFontSize = Math.max(8, fontSize * 0.8);
-      ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-      if (ctx.measureText(dimText).width < w - 8) {
-        ctx.fillText(dimText, 0, fontSize * 0.7);
-      }
-    }
+    // Inline labels removed — dynamic component labels (pills) handle all labeling
 
     ctx.restore();
   });
