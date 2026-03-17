@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import FreeRoomPlannerLogo from "@/components/FreeRoomPlannerLogo";
+import { useDocumentMeta } from "@/hooks/use-document-meta";
 
 const features = [
   {
@@ -70,6 +71,10 @@ const faqs = [
 ];
 
 export default function Landing() {
+  useDocumentMeta({
+    title: "Free Room Planner — Design Any Room Layout Online",
+    description: "Plan any room for free — kitchens, bathrooms, bedrooms and living rooms. Draw walls, drag furniture, and export your floor plan as PNG. No login required.",
+  });
   const [, navigate] = useLocation();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [isDark, setIsDark] = useState(false);

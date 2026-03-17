@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useDocumentMeta } from "../hooks/use-document-meta";
 import { useEditor } from "../hooks/use-editor";
 import { useIsMobile } from "../hooks/use-mobile";
 import FloorPlanCanvas from "../components/FloorPlanCanvas";
@@ -38,6 +39,10 @@ function generateId(): string {
 }
 
 export default function Editor() {
+  useDocumentMeta({
+    title: "Room Editor — Free Room Planner",
+    description: "Draw walls, place furniture, and export your floor plan as PNG. Free online room planning tool — no account required.",
+  });
   const editor = useEditor();
   const { state } = editor;
   const isMobile = useIsMobile();
