@@ -119,7 +119,14 @@ export async function exportToPdf(state: EditorState, roomName: string) {
   ctx.fillStyle = "#7a7974";
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
-  ctx.fillText("1 metre", scaleX + scaleBarLen / 2, scaleY - 6 * scale);
+  // Label the scale bar based on selected units
+  let scaleLabel = "1 metre";
+  switch (state.units) {
+    case "ft": scaleLabel = "3 feet"; break;
+    case "cm": scaleLabel = "100cm"; break;
+    case "mm": scaleLabel = "1000mm"; break;
+  }
+  ctx.fillText(scaleLabel, scaleX + scaleBarLen / 2, scaleY - 6 * scale);
 
   // Generate PDF
   const pdf = new jsPDF({

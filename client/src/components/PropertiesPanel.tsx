@@ -1,4 +1,4 @@
-import { Wall, FurnitureItem, RoomLabel, LabelSize, LabelColor, isWallCupboard } from "../lib/types";
+import { Wall, FurnitureItem, RoomLabel, LabelSize, LabelColor, UnitSystem, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RotateCw, Trash2, Ruler, Copy, Bold, Square } from "lucide-react";
@@ -12,6 +12,24 @@ interface PropertiesPanelProps {
   onDuplicate: () => void;
   onUpdateFurniture: (id: string, updates: Partial<FurnitureItem>) => void;
   onUpdateLabel: (id: string, updates: Partial<RoomLabel>) => void;
+  units: UnitSystem;
+}
+
+/** Format a cm value for display in the selected units */
+function formatDimension(cm: number, units: UnitSystem): string {
+  switch (units) {
+    case "m": return `${(cm / 100).toFixed(2)}m`;
+    case "cm": return `${Math.round(cm)}cm`;
+    case "mm": return `${Math.round(cm * 10)}mm`;
+    case "ft": {
+      const totalInches = cm / 2.54;
+      const feet = Math.floor(totalInches / 12);
+      const inches = Math.round(totalInches % 12);
+      if (inches === 12) return `${feet + 1}'0"`;
+      if (feet === 0) return `${inches}"`;
+      return `${feet}'${inches}"`;
+    }
+  }
 }
 
 const LABEL_COLORS: { color: LabelColor; hex: string; label: string }[] = [
@@ -36,6 +54,7 @@ export default function PropertiesPanel({
   onDuplicate,
   onUpdateFurniture,
   onUpdateLabel,
+  units,
 }: PropertiesPanelProps) {
   if (!selectedWall && !selectedFurniture && !selectedLabel) {
     return (
@@ -58,11 +77,11 @@ export default function PropertiesPanel({
           <div className="flex items-center gap-2">
             <Ruler className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-muted-foreground">Length:</span>
-            <span className="font-medium">{(lengthCm / 100).toFixed(2)}m</span>
+            <span className="font-medium">{formatDimension(lengthCm, units)}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground ml-5">Thickness:</span>
-            <span className="font-medium">{selectedWall.thickness}cm</span>
+            <span className="font-medium">{formatDimension(selectedWall.thickness, units)}</span>
           </div>
         </div>
         <Button size="sm" variant="ghost" onClick={onDelete} className="text-destructive w-full mt-2 min-h-[44px] md:min-h-0" data-testid="btn-delete-wall">
@@ -106,39 +125,41 @@ export default function PropertiesPanel({
             <span className="text-muted-foreground">{widthLabel}</span>
             <Input
               type="number"
-              min={minWidth}
-              value={selectedFurniture.width}
+              min={Math.round(cmToDisplay(minWidth, units))}
+              value={Math.round(cmToDisplay(selectedFurniture.width, units) * 100) / 100}
               onChange={(e) => {
-                const val = Math.max(minWidth, parseInt(e.target.value) || minWidth);
-                const delta = val - selectedFurniture.width;
+                const displayVal = parseFloat(e.target.value) || 0;
+                const newCm = Math.max(minWidth, displayToCm(displayVal, units));
+                const delta = newCm - selectedFurniture.width;
                 onUpdateFurniture(selectedFurniture.id, {
-                  width: val,
+                  width: newCm,
                   x: selectedFurniture.x - delta / 2,
                 });
               }}
               className="h-9 w-24 text-sm md:h-7 md:w-20"
               data-testid="input-furniture-width"
             />
-            <span className="text-muted-foreground text-xs">cm</span>
+            <span className="text-muted-foreground text-xs">{dimensionSuffix(units)}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">{heightLabel}</span>
             <Input
               type="number"
-              min={minHeight}
-              value={selectedFurniture.height}
+              min={Math.round(cmToDisplay(minHeight, units))}
+              value={Math.round(cmToDisplay(selectedFurniture.height, units) * 100) / 100}
               onChange={(e) => {
-                const val = Math.max(minHeight, parseInt(e.target.value) || minHeight);
-                const delta = val - selectedFurniture.height;
+                const displayVal = parseFloat(e.target.value) || 0;
+                const newCm = Math.max(minHeight, displayToCm(displayVal, units));
+                const delta = newCm - selectedFurniture.height;
                 onUpdateFurniture(selectedFurniture.id, {
-                  height: val,
+                  height: newCm,
                   y: selectedFurniture.y - delta / 2,
                 });
               }}
               className="h-9 w-24 text-sm md:h-7 md:w-20"
               data-testid="input-furniture-height"
             />
-            <span className="text-muted-foreground text-xs">cm</span>
+            <span className="text-muted-foreground text-xs">{dimensionSuffix(units)}</span>
           </div>
           {isWallCup && (
             <div className="flex items-center gap-2">
@@ -146,15 +167,16 @@ export default function PropertiesPanel({
               <Input
                 type="number"
                 min={0}
-                value={selectedFurniture.heightFromFloor ?? 145}
+                value={Math.round(cmToDisplay(selectedFurniture.heightFromFloor ?? 145, units) * 100) / 100}
                 onChange={(e) => {
-                  const val = Math.max(0, parseInt(e.target.value) || 0);
-                  onUpdateFurniture(selectedFurniture.id, { heightFromFloor: val });
+                  const displayVal = parseFloat(e.target.value) || 0;
+                  const newCm = Math.max(0, displayToCm(displayVal, units));
+                  onUpdateFurniture(selectedFurniture.id, { heightFromFloor: newCm });
                 }}
                 className="h-9 w-24 text-sm md:h-7 md:w-20"
                 data-testid="input-furniture-height-from-floor"
               />
-              <span className="text-muted-foreground text-xs">cm</span>
+              <span className="text-muted-foreground text-xs">{dimensionSuffix(units)}</span>
             </div>
           )}
           <div className="flex items-center gap-2">

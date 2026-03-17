@@ -17,7 +17,7 @@ const INITIAL_STATE: EditorState = {
   wallDrawing: null,
   wallChainStart: null,
   roomName: "My Room",
-  units: "metric" as UnitSystem,
+  units: "m" as UnitSystem,
   roomNames: {},
   componentLabelsVisible: true,
 };
