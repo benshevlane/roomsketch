@@ -79,6 +79,14 @@ export function useEditor() {
     setState((s) => ({ ...s, walls: s.walls.filter((w) => w.id !== id), selectedItemId: null }));
   }, [pushUndo]);
 
+  const updateWall = useCallback((id: string, updates: Partial<Wall>) => {
+    pushUndo();
+    setState((s) => ({
+      ...s,
+      walls: s.walls.map((w) => w.id === id ? { ...w, ...updates } : w),
+    }));
+  }, [pushUndo]);
+
   const addFurniture = useCallback((template: FurnitureTemplate, position: Point) => {
     pushUndo();
     const item: FurnitureItem = {
@@ -308,6 +316,7 @@ export function useEditor() {
     setSelectedItem,
     addWall,
     removeWall,
+    updateWall,
     addFurniture,
     moveFurniture,
     rotateFurniture,

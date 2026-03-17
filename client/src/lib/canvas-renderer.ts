@@ -424,7 +424,8 @@ export function drawWalls(
     for (const id of group.wallIds) mergedWallIds.add(id);
   }
 
-  // Draw all wall lines
+  // Draw all walls as solid-filled polygons (architectural style)
+  // First pass: draw filled wall rectangles
   walls.forEach((wall) => {
     const sx = wall.start.x * pxPerCm + panOffset.x;
     const sy = wall.start.y * pxPerCm + panOffset.y;
@@ -432,19 +433,60 @@ export function drawWalls(
     const ey = wall.end.y * pxPerCm + panOffset.y;
 
     const isSelected = wall.id === selectedId;
+    const halfThick = (wall.thickness * pxPerCm) / 2;
 
-    ctx.strokeStyle = isSelected ? SELECT_COLOR : (isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT);
-    ctx.lineWidth = wall.thickness * pxPerCm;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    // Compute perpendicular offset for wall polygon corners
+    const dx = ex - sx;
+    const dy = ey - sy;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.01) return;
+    const nx = (-dy / len) * halfThick; // perpendicular normal x
+    const ny = (dx / len) * halfThick;  // perpendicular normal y
+
+    const fillColor = isSelected ? SELECT_COLOR : (isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT);
+
+    ctx.fillStyle = fillColor;
     ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(ex, ey);
-    ctx.stroke();
+    ctx.moveTo(sx + nx, sy + ny);
+    ctx.lineTo(sx - nx, sy - ny);
+    ctx.lineTo(ex - nx, ey - ny);
+    ctx.lineTo(ex + nx, ey + ny);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // Second pass: fill junction squares where walls meet (avoids gaps at corners)
+  const CONNECT_THRESHOLD = 15; // cm, same as wall snap threshold
+  const endpointMap = new Map<string, { x: number; y: number; thickness: number }[]>();
+  walls.forEach((wall) => {
+    const points = [
+      { x: wall.start.x, y: wall.start.y },
+      { x: wall.end.x, y: wall.end.y },
+    ];
+    points.forEach((pt) => {
+      const key = `${Math.round(pt.x / CONNECT_THRESHOLD) * CONNECT_THRESHOLD},${Math.round(pt.y / CONNECT_THRESHOLD) * CONNECT_THRESHOLD}`;
+      if (!endpointMap.has(key)) endpointMap.set(key, []);
+      endpointMap.get(key)!.push({ ...pt, thickness: wall.thickness });
+    });
+  });
+  endpointMap.forEach((endpoints) => {
+    if (endpoints.length < 2) return;
+    // Draw a filled circle at the junction to cover corner gaps
+    const avgX = endpoints.reduce((s, e) => s + e.x, 0) / endpoints.length;
+    const avgY = endpoints.reduce((s, e) => s + e.y, 0) / endpoints.length;
+    const maxThick = Math.max(...endpoints.map((e) => e.thickness));
+    const halfThick = (maxThick * pxPerCm) / 2;
+    const px = avgX * pxPerCm + panOffset.x;
+    const py = avgY * pxPerCm + panOffset.y;
+
+    ctx.fillStyle = isDark ? WALL_COLOR_DARK : WALL_COLOR_LIGHT;
+    ctx.beginPath();
+    ctx.arc(px, py, halfThick, 0, Math.PI * 2);
+    ctx.fill();
   });
 
   // Identify doors/windows for occupant checks
-  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "window");
+  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
 
   // Draw individual labels for non-merged walls (skip if wall has door/window occupants — total shown separately)
   walls.forEach((wall) => {
@@ -594,7 +636,7 @@ export function drawWallSegmentMeasurements(
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
   const color = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
-  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "window");
+  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
   if (doorsWindows.length === 0) return;
 
   // Wall inside measurements are always shown via drawWalls(); no segment breakdown needed.
@@ -1286,22 +1328,135 @@ function drawFurnitureDetail(
       ctx.arc(-w / 2, -h / 2, w, 0, Math.PI / 2);
       ctx.stroke();
       break;
-    case "window":
-      // Draw window as a line with glass rectangle indicator
+    case "door_double":
+      // Double/French door: two opposing swing arcs meeting in center
       ctx.lineWidth = 2;
+      // Left door panel
+      ctx.beginPath();
+      ctx.moveTo(0, h / 2);
+      ctx.lineTo(-w / 2, h / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(-w / 2, h / 2, w / 2, -Math.PI / 2, 0);
+      ctx.stroke();
+      // Right door panel
+      ctx.beginPath();
+      ctx.moveTo(0, h / 2);
+      ctx.lineTo(w / 2, h / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, w / 2, Math.PI, -Math.PI / 2);
+      ctx.stroke();
+      break;
+    case "window":
+      // Architectural window: two parallel lines with frame ends
+      ctx.lineWidth = 2;
+      // Outer frame lines
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h * 0.3);
+      ctx.lineTo(w / 2, -h * 0.3);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, h * 0.3);
+      ctx.lineTo(w / 2, h * 0.3);
+      ctx.stroke();
+      // Frame end caps
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h * 0.3);
+      ctx.lineTo(-w / 2, h * 0.3);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(w / 2, -h * 0.3);
+      ctx.lineTo(w / 2, h * 0.3);
+      ctx.stroke();
+      // Glass fill between lines
+      ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.1)" : "rgba(1, 105, 111, 0.07)";
+      ctx.fillRect(-w / 2, -h * 0.3, w, h * 0.6);
+      // Center divider
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, -h * 0.3);
+      ctx.lineTo(0, h * 0.3);
+      ctx.stroke();
+      break;
+    case "bay_window":
+      // Bay window: trapezoid with 3 glass panes (center + 2 angled sides)
+      ctx.lineWidth = 2;
+      const bwInset = w * 0.25; // how far the sides angle in
+      // Outer shape (trapezoid)
       ctx.beginPath();
       ctx.moveTo(-w / 2, 0);
+      ctx.lineTo(-w / 2 + bwInset, -h / 2);
+      ctx.lineTo(w / 2 - bwInset, -h / 2);
       ctx.lineTo(w / 2, 0);
+      ctx.closePath();
       ctx.stroke();
-      // Glass pane indicator
-      ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.15)" : "rgba(1, 105, 111, 0.1)";
-      ctx.fillRect(-w * 0.4, -h * 0.35, w * 0.8, h * 0.7);
-      ctx.strokeRect(-w * 0.4, -h * 0.35, w * 0.8, h * 0.7);
-      // Center divider
+      // Glass fill
+      ctx.fillStyle = isDark ? "rgba(79, 152, 163, 0.1)" : "rgba(1, 105, 111, 0.07)";
+      ctx.fill();
+      // Inner pane dividers (two vertical lines creating 3 sections)
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2 + bwInset, 0);
+      ctx.lineTo(-w / 2 + bwInset, -h / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(w / 2 - bwInset, 0);
+      ctx.lineTo(w / 2 - bwInset, -h / 2);
+      ctx.stroke();
+      break;
+    case "stairs":
+      // Staircase: rectangle with parallel tread lines and direction arrow
+      ctx.lineWidth = 1;
+      const numTreads = Math.max(5, Math.round(h / (w * 0.3)));
+      const treadSpacing = h / numTreads;
+      for (let i = 1; i < numTreads; i++) {
+        const ty = -h / 2 + i * treadSpacing;
+        ctx.beginPath();
+        ctx.moveTo(-w / 2, ty);
+        ctx.lineTo(w / 2, ty);
+        ctx.stroke();
+      }
+      // Direction arrow (pointing up)
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.35);
+      ctx.lineTo(0, -h * 0.35);
+      ctx.stroke();
+      // Arrowhead
       ctx.beginPath();
       ctx.moveTo(0, -h * 0.35);
-      ctx.lineTo(0, h * 0.35);
+      ctx.lineTo(-w * 0.15, -h * 0.2);
+      ctx.moveTo(0, -h * 0.35);
+      ctx.lineTo(w * 0.15, -h * 0.2);
       ctx.stroke();
+      break;
+    case "radiator":
+      // Radiator: rectangle with vertical fin lines
+      ctx.lineWidth = 1;
+      const numFins = Math.max(4, Math.round(w / 12));
+      const finSpacing = w / (numFins + 1);
+      for (let i = 1; i <= numFins; i++) {
+        const fx = -w / 2 + i * finSpacing;
+        ctx.beginPath();
+        ctx.moveTo(fx, -h * 0.35);
+        ctx.lineTo(fx, h * 0.35);
+        ctx.stroke();
+      }
+      break;
+    case "boiler":
+      // Boiler: rectangle with circle containing "B"
+      ctx.lineWidth = 1;
+      const boilerRadius = Math.min(w, h) * 0.3;
+      ctx.beginPath();
+      ctx.arc(0, 0, boilerRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      // "B" label
+      ctx.fillStyle = stroke;
+      ctx.font = `bold ${boilerRadius * 1.2}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("B", 0, 0);
       break;
   }
 }

@@ -592,6 +592,7 @@ export default function Editor() {
                       onUpdateFurniture={handleUpdateFurniture}
                       onUpdateLabel={editor.updateLabel}
                       onUpdateTextBox={editor.updateTextBox}
+                      onUpdateWall={editor.updateWall}
                       units={state.units}
                     />
                   </ScrollArea>
@@ -648,6 +649,7 @@ export default function Editor() {
                 onUpdateFurniture={handleUpdateFurniture}
                 onUpdateLabel={editor.updateLabel}
                 onUpdateTextBox={editor.updateTextBox}
+                onUpdateWall={editor.updateWall}
                 units={state.units}
               />
             </ScrollArea>
