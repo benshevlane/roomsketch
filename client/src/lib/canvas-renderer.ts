@@ -2109,9 +2109,10 @@ export function snapFurnitureToWalls(
   item: FurnitureItem,
   walls: Wall[],
   threshold: number = 12 // cm tolerance for snapping
-): { x: number; y: number; didSnap: boolean } {
+): { x: number; y: number; didSnap: boolean; snappedWallThickness?: number } {
   let { x, y } = item;
   let didSnap = false;
+  let snappedWallThickness: number | undefined;
   const bb = { left: x, right: x + item.width, top: y, bottom: y + item.height };
 
   for (const wall of walls) {
@@ -2137,22 +2138,22 @@ export function snapFurnitureToWalls(
         // Snap furniture bottom to wall top edge
         if (Math.abs(bb.bottom - wallTopEdge) < threshold) {
           y = wallTopEdge - item.height;
-          didSnap = true;
+          didSnap = true; snappedWallThickness = wall.thickness;
         }
         // Snap furniture top to wall bottom edge
         if (Math.abs(bb.top - wallBottomEdge) < threshold) {
           y = wallBottomEdge;
-          didSnap = true;
+          didSnap = true; snappedWallThickness = wall.thickness;
         }
         // Snap furniture top to wall top edge
         if (Math.abs(bb.top - wallTopEdge) < threshold) {
           y = wallTopEdge;
-          didSnap = true;
+          didSnap = true; snappedWallThickness = wall.thickness;
         }
         // Snap furniture bottom to wall bottom edge
         if (Math.abs(bb.bottom - wallBottomEdge) < threshold) {
           y = wallBottomEdge - item.height;
-          didSnap = true;
+          didSnap = true; snappedWallThickness = wall.thickness;
         }
       }
       // Snap furniture edges to wall endpoints (horizontal alignment)
@@ -2160,12 +2161,12 @@ export function snapFurnitureToWalls(
         // Left edge to wall left end
         if (Math.abs(bb.left - wallMinX) < threshold) {
           x = wallMinX;
-          didSnap = true;
+          didSnap = true; snappedWallThickness = wall.thickness;
         }
         // Right edge to wall right end
         if (Math.abs(bb.right - wallMaxX) < threshold) {
           x = wallMaxX - item.width;
-          didSnap = true;
+          didSnap = true; snappedWallThickness = wall.thickness;
         }
       }
     }
@@ -2181,22 +2182,22 @@ export function snapFurnitureToWalls(
         // Snap furniture right to wall left edge
         if (Math.abs(bb.right - wallLeftEdge) < threshold) {
           x = wallLeftEdge - item.width;
-          didSnap = true;
+          didSnap = true; snappedWallThickness = wall.thickness;
         }
         // Snap furniture left to wall right edge
         if (Math.abs(bb.left - wallRightEdge) < threshold) {
           x = wallRightEdge;
-          didSnap = true;
+          didSnap = true; snappedWallThickness = wall.thickness;
         }
         // Snap furniture left to wall left edge
         if (Math.abs(bb.left - wallLeftEdge) < threshold) {
           x = wallLeftEdge;
-          didSnap = true;
+          didSnap = true; snappedWallThickness = wall.thickness;
         }
         // Snap furniture right to wall right edge
         if (Math.abs(bb.right - wallRightEdge) < threshold) {
           x = wallRightEdge - item.width;
-          didSnap = true;
+          didSnap = true; snappedWallThickness = wall.thickness;
         }
       }
       // Snap furniture edges to wall endpoints (vertical alignment)
@@ -2204,18 +2205,18 @@ export function snapFurnitureToWalls(
         // Top edge to wall top end
         if (Math.abs(bb.top - wallMinY) < threshold) {
           y = wallMinY;
-          didSnap = true;
+          didSnap = true; snappedWallThickness = wall.thickness;
         }
         // Bottom edge to wall bottom end
         if (Math.abs(bb.bottom - wallMaxY) < threshold) {
           y = wallMaxY - item.height;
-          didSnap = true;
+          didSnap = true; snappedWallThickness = wall.thickness;
         }
       }
     }
   }
 
-  return { x, y, didSnap };
+  return { x, y, didSnap, snappedWallThickness };
 }
 
 /** Draw eraser hover highlight on the item that will be deleted */
