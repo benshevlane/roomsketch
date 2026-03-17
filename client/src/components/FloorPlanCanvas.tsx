@@ -682,6 +682,11 @@ export default function FloorPlanCanvas({
           const tempItem = { ...furn, x: snappedX, y: snappedY };
           const wallSnap = snapFurnitureToWalls(tempItem, state.walls);
           onMoveFurniture(state.selectedItemId, wallSnap.x, wallSnap.y);
+          // Snap opening thickness to wall thickness
+          const isOpening = furn.type === "door" || furn.type === "window";
+          if (isOpening && wallSnap.didSnap && wallSnap.snappedWallThickness != null && furn.height !== wallSnap.snappedWallThickness) {
+            onUpdateFurniture(state.selectedItemId, { height: wallSnap.snappedWallThickness });
+          }
           return;
         }
         const lbl = state.labels.find((l) => l.id === state.selectedItemId);
@@ -943,10 +948,23 @@ export default function FloorPlanCanvas({
       try {
         const data = e.dataTransfer.getData("application/json");
         if (!data) return;
-        const template: FurnitureTemplate = JSON.parse(data);
+        let template: FurnitureTemplate = JSON.parse(data);
         const pos = getCanvasPosMouse(e);
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
         const snapped = snapToGrid(world, 10);
+        // Snap opening thickness to wall thickness on drop
+        const isOpening = template.type === "door" || template.type === "window";
+        if (isOpening) {
+          const tempItem: FurnitureItem = {
+            id: "", type: template.type, label: template.label,
+            x: snapped.x - template.width / 2, y: snapped.y - template.height / 2,
+            width: template.width, height: template.height, rotation: 0, category: template.category,
+          };
+          const wallSnap = snapFurnitureToWalls(tempItem, state.walls);
+          if (wallSnap.didSnap && wallSnap.snappedWallThickness != null) {
+            template = { ...template, height: wallSnap.snappedWallThickness };
+          }
+        }
         onDropFurniture(template, snapped);
       } catch {}
     },
