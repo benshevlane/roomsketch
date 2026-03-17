@@ -2132,6 +2132,159 @@ export function drawEraserHighlight(
 // Label Collision Avoidance System
 // ==========================================
 
+export interface ComponentLabelInfo {
+  item: FurnitureItem;
+  centerX: number;
+  labelY: number;
+  displayName: string;
+  dimText: string;
+  nameFontSize: number;
+  dimFontSize: number;
+  pillW: number;
+  pillH: number;
+  isSelected: boolean;
+  nameColor: string;
+}
+
+/** Measure component labels without drawing — returns info needed for deferred rendering */
+export function collectComponentLabelRects(
+  ctx: CanvasRenderingContext2D,
+  furniture: FurnitureItem[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  selectedId: string | null,
+  units: UnitSystem = "metric"
+): ComponentLabelInfo[] {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const results: ComponentLabelInfo[] = [];
+
+  for (const item of furniture) {
+    const centerX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
+    const centerY = (item.y + item.height / 2) * pxPerCm + panOffset.y;
+    const h = item.height * pxPerCm;
+    const isSelected = item.id === selectedId;
+    const labelY = centerY + h / 2 + 14 * zoom;
+
+    const displayName = item.customName || item.label;
+    const dimText = `${item.width} \u00D7 ${item.height} cm`;
+
+    const nameFontSize = Math.max(9, 11 * zoom);
+    const dimFontSize = Math.max(8, 9 * zoom);
+
+    ctx.font = `${isSelected ? "600" : "500"} ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const nameWidth = ctx.measureText(displayName).width;
+    ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const dimWidth = ctx.measureText(dimText).width;
+    const maxWidth = Math.max(nameWidth, dimWidth);
+    const pillW = maxWidth + 10;
+    const pillH = nameFontSize + dimFontSize + 8;
+
+    const nameColor = isSelected
+      ? (isDark ? "#4f98a3" : "#01696f")
+      : (isDark ? "rgba(79, 152, 163, 0.65)" : "rgba(1, 105, 111, 0.55)");
+
+    results.push({
+      item, centerX, labelY, displayName, dimText,
+      nameFontSize, dimFontSize, pillW, pillH, isSelected, nameColor,
+    });
+  }
+
+  return results;
+}
+
+/** Draw a single component label at a given position */
+function drawSingleComponentLabel(
+  ctx: CanvasRenderingContext2D,
+  info: ComponentLabelInfo,
+  drawX: number,
+  drawY: number,
+  isDark: boolean
+) {
+  const { displayName, dimText, nameFontSize, dimFontSize, pillW, pillH, isSelected, nameColor } = info;
+
+  // Background pill
+  const pillX = drawX - pillW / 2;
+  const pillY = drawY - 2;
+  ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.7)" : "rgba(247, 246, 242, 0.75)";
+  ctx.beginPath();
+  const r = 4;
+  ctx.moveTo(pillX + r, pillY);
+  ctx.lineTo(pillX + pillW - r, pillY);
+  ctx.arcTo(pillX + pillW, pillY, pillX + pillW, pillY + r, r);
+  ctx.lineTo(pillX + pillW, pillY + pillH - r);
+  ctx.arcTo(pillX + pillW, pillY + pillH, pillX + pillW - r, pillY + pillH, r);
+  ctx.lineTo(pillX + r, pillY + pillH);
+  ctx.arcTo(pillX, pillY + pillH, pillX, pillY + pillH - r, r);
+  ctx.lineTo(pillX, pillY + r);
+  ctx.arcTo(pillX, pillY, pillX + r, pillY, r);
+  ctx.closePath();
+  ctx.fill();
+
+  // Name
+  ctx.font = `${isSelected ? "600" : "500"} ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+  ctx.fillStyle = nameColor;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText(displayName, drawX, drawY);
+
+  // Dimensions
+  ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+  ctx.fillStyle = isDark ? "rgba(121, 120, 118, 0.8)" : "rgba(122, 121, 116, 0.7)";
+  ctx.fillText(dimText, drawX, drawY + nameFontSize + 2);
+}
+
+/** Draw a single freeform label at a given position */
+function drawSingleFreeformLabel(
+  ctx: CanvasRenderingContext2D,
+  label: RoomLabel,
+  drawX: number,
+  drawY: number,
+  isDark: boolean,
+  isSelected: boolean,
+  zoom: number = 1
+) {
+  const resolvedSize = resolveLabelSize(label.size);
+  const fontSize = resolvedSize * zoom;
+  const weight = label.bold ? "700" : "600";
+  ctx.font = `${weight} ${fontSize}px 'General Sans', 'DM Sans', sans-serif`;
+
+  const textWidth = ctx.measureText(label.text).width;
+  const textHeight = fontSize;
+
+  if (label.background) {
+    const padX = 8;
+    const padY = 4;
+    const pW = textWidth + padX * 2;
+    const pH = textHeight + padY * 2;
+    const pX = drawX - pW / 2;
+    const pY = drawY - pH / 2;
+    const rr = pH / 2;
+
+    ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.85)" : "rgba(255, 255, 255, 0.9)";
+    ctx.beginPath();
+    ctx.moveTo(pX + rr, pY);
+    ctx.lineTo(pX + pW - rr, pY);
+    ctx.arcTo(pX + pW, pY, pX + pW, pY + rr, rr);
+    ctx.arcTo(pX + pW, pY + pH, pX + pW - rr, pY + pH, rr);
+    ctx.lineTo(pX + rr, pY + pH);
+    ctx.arcTo(pX, pY + pH, pX, pY + pH - rr, rr);
+    ctx.arcTo(pX, pY, pX + rr, pY, rr);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = resolveLabelColor(label.color, isDark, isSelected);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label.text, drawX, drawY);
+}
+
 interface LabelRect {
   x: number; // center x (screen px)
   y: number; // center y (screen px)
@@ -2140,6 +2293,7 @@ interface LabelRect {
   priority: number; // 0 = highest (room), 1 = wall, 2 = component, 3 = freeform
   anchorX: number; // original anchor point
   anchorY: number;
+  sourceIndex: number; // index into source array (-1 for room/wall labels)
 }
 
 function rectsOverlap(a: LabelRect, b: LabelRect): boolean {
@@ -2154,20 +2308,21 @@ export function resolveAndDrawLabelCollisions(
   ctx: CanvasRenderingContext2D,
   rooms: DetectedRoom[],
   walls: Wall[],
-  furniture: FurnitureItem[],
+  componentLabelInfos: ComponentLabelInfo[],
   labels: RoomLabel[],
   gridSize: number,
   zoom: number,
   panOffset: Point,
   isDark: boolean,
   roomNames: Record<string, string>,
-  componentLabelsVisible: boolean
+  componentLabelsVisible: boolean,
+  selectedId: string | null
 ): void {
   // Collect all label rects with priority
   const allRects: LabelRect[] = [];
   const pxPerCm = (gridSize * zoom) / 100;
 
-  // Room labels (priority 0)
+  // Room labels (priority 0) — immovable anchors, already drawn by drawRoomAreas
   for (const room of rooms) {
     const cx = room.centroid.x * pxPerCm + panOffset.x;
     const cy = room.centroid.y * pxPerCm + panOffset.y;
@@ -2180,32 +2335,27 @@ export function resolveAndDrawLabelCollisions(
     const totalH = nameFontSize + areaFontSize + 4;
     allRects.push({
       x: cx, y: cy, w: nameW / 2 + 4, h: totalH / 2 + 2,
-      priority: 0, anchorX: cx, anchorY: cy,
+      priority: 0, anchorX: cx, anchorY: cy, sourceIndex: -1,
     });
   }
 
   // Component labels (priority 2)
   if (componentLabelsVisible) {
-    for (const item of furniture) {
-      const centerX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
-      const h = item.height * pxPerCm;
-      const labelY = (item.y + item.height / 2) * pxPerCm + panOffset.y + h / 2 + 14 * zoom;
-      const displayName = item.customName || item.label;
-      const nameFontSize = Math.max(9, 11 * zoom);
-      const dimFontSize = Math.max(8, 9 * zoom);
-      ctx.font = `500 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-      const nameW = ctx.measureText(displayName).width;
-      const totalH = nameFontSize + dimFontSize + 8;
+    for (let i = 0; i < componentLabelInfos.length; i++) {
+      const info = componentLabelInfos[i];
+      const totalH = info.pillH;
       allRects.push({
-        x: centerX, y: labelY + totalH / 2 - 2,
-        w: nameW / 2 + 8, h: totalH / 2 + 2,
-        priority: 2, anchorX: centerX, anchorY: labelY,
+        x: info.centerX, y: info.labelY + totalH / 2 - 2,
+        w: info.pillW / 2 + 4, h: totalH / 2 + 2,
+        priority: 2, anchorX: info.centerX, anchorY: info.labelY,
+        sourceIndex: i,
       });
     }
   }
 
   // Freeform labels (priority 3)
-  for (const label of labels) {
+  for (let i = 0; i < labels.length; i++) {
+    const label = labels[i];
     const x = label.x * pxPerCm + panOffset.x;
     const y = label.y * pxPerCm + panOffset.y;
     const resolvedSize = resolveLabelSize(label.size);
@@ -2215,7 +2365,7 @@ export function resolveAndDrawLabelCollisions(
     const textW = ctx.measureText(label.text).width;
     allRects.push({
       x, y, w: textW / 2 + 4, h: fontSize / 2 + 4,
-      priority: 3, anchorX: x, anchorY: y,
+      priority: 3, anchorX: x, anchorY: y, sourceIndex: i,
     });
   }
 
@@ -2241,7 +2391,7 @@ export function resolveAndDrawLabelCollisions(
     nudgedLabels.push({ rect, nudged });
   }
 
-  // Draw leader lines for nudged labels
+  // Draw leader lines for nudged labels, then draw labels at resolved positions
   ctx.save();
   ctx.setLineDash([3, 3]);
   ctx.lineWidth = 1;
@@ -2258,6 +2408,27 @@ export function resolveAndDrawLabelCollisions(
 
   ctx.setLineDash([]);
   ctx.restore();
+
+  // Draw component labels at their resolved (possibly nudged) positions
+  if (componentLabelsVisible) {
+    for (const { rect } of nudgedLabels) {
+      if (rect.priority === 2 && rect.sourceIndex >= 0) {
+        const info = componentLabelInfos[rect.sourceIndex];
+        // rect.y is the center of the label rect; convert back to top-of-label Y
+        const resolvedLabelY = rect.y - info.pillH / 2 + 2;
+        drawSingleComponentLabel(ctx, info, rect.x, resolvedLabelY, isDark);
+      }
+    }
+  }
+
+  // Draw freeform labels at their resolved (possibly nudged) positions
+  for (const { rect } of nudgedLabels) {
+    if (rect.priority === 3 && rect.sourceIndex >= 0) {
+      const label = labels[rect.sourceIndex];
+      const isSelected = label.id === selectedId;
+      drawSingleFreeformLabel(ctx, label, rect.x, rect.y, isDark, isSelected, zoom);
+    }
+  }
 }
 
 /** Detect parallel wall pairs with different lengths and flag with amber color */
