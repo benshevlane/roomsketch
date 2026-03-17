@@ -5,7 +5,6 @@ import {
   drawWalls,
   drawMeasurementIndicatorLines,
   drawFurniture,
-  drawLabels,
   drawWallPreview,
   drawRoomAreas,
   drawResizeHandles,
@@ -13,7 +12,7 @@ import {
   drawAlignmentGuides,
   drawDistanceMeasurements,
   drawEraserHighlight,
-  drawComponentLabels,
+  collectComponentLabelRects,
   resolveAndDrawLabelCollisions,
   findParallelWallDiscrepancies,
   drawWallLabelsWithDiscrepancy,
@@ -231,10 +230,10 @@ export default function FloorPlanCanvas({
     const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "window");
     drawFurniture(ctx, doorWindowItems, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
-    // Component labels (toggleable)
-    if (state.componentLabelsVisible) {
-      drawComponentLabels(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units);
-    }
+    // Collect component label positions (without drawing) for collision resolution
+    const componentLabelInfos = state.componentLabelsVisible
+      ? collectComponentLabelRects(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units)
+      : [];
 
     // Resize handles and distance measurements for selected furniture
     const selectedFurn = state.furniture.find((f) => f.id === state.selectedItemId);
@@ -243,14 +242,11 @@ export default function FloorPlanCanvas({
       drawDistanceMeasurements(ctx, selectedFurn, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units);
     }
 
-    // Freeform Labels
-    drawLabels(ctx, state.labels, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
-
-    // Label collision avoidance
+    // Resolve label collisions and draw all labels (component + freeform) at resolved positions
     resolveAndDrawLabelCollisions(
-      ctx, rooms, state.walls, state.furniture, state.labels,
+      ctx, rooms, state.walls, componentLabelInfos, state.labels,
       state.gridSize, state.zoom, state.panOffset, isDark,
-      state.roomNames, state.componentLabelsVisible
+      state.roomNames, state.componentLabelsVisible, state.selectedItemId
     );
 
     // Snap indicator and alignment guides when wall tool is active but not drawing yet
