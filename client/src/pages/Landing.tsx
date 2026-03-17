@@ -16,7 +16,7 @@ const features = [
       <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="16" y2="14"/></svg>
     ),
     title: "Live measurements",
-    desc: "Wall lengths update in real time as you draw — in metres or feet.",
+    desc: "Wall lengths update in real time as you draw — in metres, centimetres, millimetres, or feet.",
   },
   {
     icon: (
@@ -65,7 +65,7 @@ const faqs = [
   { q: "Is it really free?", a: "Yes — completely free, no account required, no credit card, no catch." },
   { q: "Does it work on mobile?", a: "Yes. The tool works on tablet and mobile, though a desktop gives you the most space to draw." },
   { q: "Can I save my plan?", a: "Yes. Use the save button to download a JSON file you can reload later, or export a PNG to share with others." },
-  { q: "What units does it support?", a: "Both metric (metres) and imperial (feet). Switch between them with the m/ft button in the toolbar." },
+  { q: "What units does it support?", a: "Metres, centimetres, millimetres, and feet & inches. Switch between them with the units button in the toolbar." },
   { q: "Do I need to install anything?", a: "No. It runs entirely in your browser — just open the link and start drawing." },
   { q: "Can I add doors and windows?", a: "Yes — doors and windows are in the Structure category of the furniture library." },
 ];

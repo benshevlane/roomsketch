@@ -487,7 +487,7 @@ export default function Editor() {
         onClearAll={() => setShowClearDialog(true)}
         zoom={state.zoom}
         units={state.units}
-        onToggleUnits={() => editor.setUnits(state.units === "metric" ? "imperial" : "metric")}
+        onSetUnits={editor.setUnits}
         measureMode={measureMode}
         onToggleMeasureMode={toggleMeasureMode}
         isMobile={isMobile}
@@ -528,6 +528,7 @@ export default function Editor() {
                       onDuplicate={handleDuplicate}
                       onUpdateFurniture={handleUpdateFurniture}
                       onUpdateLabel={editor.updateLabel}
+                      units={state.units}
                     />
                   </ScrollArea>
                 </div>
@@ -577,6 +578,7 @@ export default function Editor() {
                 onDuplicate={handleDuplicate}
                 onUpdateFurniture={handleUpdateFurniture}
                 onUpdateLabel={editor.updateLabel}
+                units={state.units}
               />
             </ScrollArea>
 

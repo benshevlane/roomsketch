@@ -42,7 +42,53 @@ export interface RoomLabel {
 
 export type EditorTool = "select" | "wall" | "furniture" | "label" | "eraser" | "pan";
 
-export type UnitSystem = "metric" | "imperial";
+export type UnitSystem = "m" | "cm" | "mm" | "ft";
+
+/** Display labels for each unit system */
+export const UNIT_LABELS: Record<UnitSystem, string> = {
+  m: "Metres",
+  cm: "Centimetres",
+  mm: "Millimetres",
+  ft: "Feet & Inches",
+};
+
+/** Short suffix shown on the toolbar button */
+export const UNIT_SHORT: Record<UnitSystem, string> = {
+  m: "m",
+  cm: "cm",
+  mm: "mm",
+  ft: "ft",
+};
+
+/** Convert cm (internal) to a display value for the given unit */
+export function cmToDisplay(cm: number, units: UnitSystem): number {
+  switch (units) {
+    case "m": return cm / 100;
+    case "cm": return cm;
+    case "mm": return cm * 10;
+    case "ft": return cm / 2.54; // display as inches
+  }
+}
+
+/** Convert a display value back to cm (internal) */
+export function displayToCm(val: number, units: UnitSystem): number {
+  switch (units) {
+    case "m": return val * 100;
+    case "cm": return val;
+    case "mm": return val / 10;
+    case "ft": return val * 2.54; // input is inches
+  }
+}
+
+/** Unit suffix for dimension inputs (properties panel) */
+export function dimensionSuffix(units: UnitSystem): string {
+  switch (units) {
+    case "m": return "m";
+    case "cm": return "cm";
+    case "mm": return "mm";
+    case "ft": return "in";
+  }
+}
 
 export type MeasureMode = "full" | "inside";
 

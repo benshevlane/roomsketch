@@ -3,24 +3,44 @@ import { DetectedRoom } from "./room-detection";
 
 /** Convert cm to display string based on unit system */
 function formatLength(cm: number, units: UnitSystem): string {
-  if (units === "imperial") {
-    const totalInches = cm / 2.54;
-    const feet = Math.floor(totalInches / 12);
-    const inches = Math.round(totalInches % 12);
-    if (inches === 12) return `${feet + 1}'0"`;
-    if (feet === 0) return `${inches}"`;
-    return `${feet}'${inches}"`;
+  switch (units) {
+    case "ft": {
+      const totalInches = cm / 2.54;
+      const feet = Math.floor(totalInches / 12);
+      const inches = Math.round(totalInches % 12);
+      if (inches === 12) return `${feet + 1}'0"`;
+      if (feet === 0) return `${inches}"`;
+      return `${feet}'${inches}"`;
+    }
+    case "cm":
+      return `${Math.round(cm)}cm`;
+    case "mm":
+      return `${Math.round(cm * 10)}mm`;
+    case "m":
+    default:
+      return `${(cm / 100).toFixed(2)}m`;
   }
-  return `${(cm / 100).toFixed(2)}m`;
 }
 
 /** Convert m² to display string based on unit system */
 function formatArea(sqM: number, units: UnitSystem): string {
-  if (units === "imperial") {
-    const sqFt = sqM * 10.7639;
-    return `${sqFt.toFixed(1)} sq ft`;
+  switch (units) {
+    case "ft": {
+      const sqFt = sqM * 10.7639;
+      return `${sqFt.toFixed(1)} sq ft`;
+    }
+    case "cm": {
+      const sqCm = sqM * 10000;
+      return `${sqCm.toFixed(0)} cm\u00B2`;
+    }
+    case "mm": {
+      const sqMm = sqM * 1000000;
+      return `${sqMm.toFixed(0)} mm\u00B2`;
+    }
+    case "m":
+    default:
+      return `${sqM.toFixed(1)} m\u00B2`;
   }
-  return `${sqM.toFixed(1)} m\u00B2`;
 }
 
 const GRID_COLOR_LIGHT = "#e8e5e0";
@@ -94,7 +114,8 @@ export function computeRoomLabelPositions(
   furniture: FurnitureItem[],
   gridSize: number,
   zoom: number,
-  roomNames: Record<string, string>
+  roomNames: Record<string, string>,
+  units: UnitSystem = "m"
 ): Map<string, Point> {
   const result = new Map<string, Point>();
   const pxPerCm = (gridSize * zoom) / 100;
@@ -121,7 +142,7 @@ export function computeRoomLabelPositions(
     ctx.font = `600 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
     const nameWidth = ctx.measureText(roomName).width;
     ctx.font = `500 ${areaFontSize}px 'General Sans', 'DM Sans', sans-serif`;
-    const areaText = formatArea(room.area, "metric");
+    const areaText = formatArea(room.area, units);
     const areaWidth = ctx.measureText(areaText).width;
     const maxTextWidth = Math.max(nameWidth, areaWidth);
     const totalHeight = nameFontSize + areaFontSize + 4;
@@ -389,7 +410,7 @@ export function drawWalls(
   panOffset: Point,
   isDark: boolean,
   selectedId: string | null,
-  units: UnitSystem = "metric",
+  units: UnitSystem = "m",
   measureMode: MeasureMode = "inside",
   furniture: FurnitureItem[] = []
 ) {
@@ -560,7 +581,7 @@ export function drawWallSegmentMeasurements(
   zoom: number,
   panOffset: Point,
   isDark: boolean,
-  units: UnitSystem = "metric",
+  units: UnitSystem = "m",
   measureMode: MeasureMode = "inside"
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
@@ -962,7 +983,7 @@ function drawWallDimensionLabel(
   sx: number, sy: number, ex: number, ey: number,
   lengthCm: number, wallThicknessPx: number,
   zoom: number, isDark: boolean,
-  units: UnitSystem = "metric",
+  units: UnitSystem = "m",
   wall?: Wall,
   furniture?: FurnitureItem[],
   gridSize?: number,
@@ -1328,7 +1349,7 @@ export function drawRoomAreas(
   zoom: number,
   panOffset: Point,
   isDark: boolean,
-  units: UnitSystem = "metric",
+  units: UnitSystem = "m",
   roomNames: Record<string, string> = {},
   selectedRoomKey: string | null = null,
   labelPositions: Map<string, Point> = new Map()
@@ -1466,7 +1487,7 @@ export function drawComponentLabels(
   panOffset: Point,
   isDark: boolean,
   selectedId: string | null,
-  units: UnitSystem = "metric"
+  units: UnitSystem = "m"
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -1542,7 +1563,7 @@ export function drawWallPreview(
   panOffset: Point,
   isDark: boolean,
   angleDeg?: number,
-  units: UnitSystem = "metric",
+  units: UnitSystem = "m",
   measureMode: MeasureMode = "inside",
   adjWallAngleRad?: number
 ) {
@@ -2469,7 +2490,7 @@ export function drawDistanceMeasurements(
   zoom: number,
   panOffset: Point,
   isDark: boolean,
-  units: UnitSystem = "metric"
+  units: UnitSystem = "m"
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
   const color = isDark ? "#e8894a" : "#d06220";
@@ -2833,7 +2854,7 @@ export function collectComponentLabelRects(
   panOffset: Point,
   isDark: boolean,
   selectedId: string | null,
-  units: UnitSystem = "metric"
+  units: UnitSystem = "m"
 ): ComponentLabelInfo[] {
   const pxPerCm = (gridSize * zoom) / 100;
   const results: ComponentLabelInfo[] = [];

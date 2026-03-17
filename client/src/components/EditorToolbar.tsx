@@ -1,4 +1,4 @@
-import { EditorTool, UnitSystem, MeasureMode } from "../lib/types";
+import { EditorTool, UnitSystem, MeasureMode, UNIT_LABELS, UNIT_SHORT } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
@@ -48,7 +48,7 @@ interface EditorToolbarProps {
   onClearAll: () => void;
   zoom: number;
   units: UnitSystem;
-  onToggleUnits: () => void;
+  onSetUnits: (units: UnitSystem) => void;
   measureMode: MeasureMode;
   onToggleMeasureMode: () => void;
   isMobile?: boolean;
@@ -84,7 +84,7 @@ export default function EditorToolbar({
   onClearAll,
   zoom,
   units,
-  onToggleUnits,
+  onSetUnits,
   measureMode,
   onToggleMeasureMode,
   isMobile,
@@ -179,9 +179,11 @@ export default function EditorToolbar({
                 Load Plan
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onToggleUnits}>
-                Units: {units === "metric" ? "Metres" : "Feet"}
-              </DropdownMenuItem>
+              {(["m", "cm", "mm", "ft"] as UnitSystem[]).map((u) => (
+                <DropdownMenuItem key={u} onClick={() => onSetUnits(u)}>
+                  {units === u ? "\u2713 " : "   "}{UNIT_LABELS[u]}
+                </DropdownMenuItem>
+              ))}
               <DropdownMenuItem onClick={onToggleMeasureMode}>
                 Measure: {measureMode === "full" ? "Full Wall" : "Inside"}
               </DropdownMenuItem>
@@ -338,20 +340,31 @@ export default function EditorToolbar({
             <p>{measureMode === "full" ? "Showing full wall length — click for inside measurement" : "Showing inside measurement — click for full wall length"}</p>
           </TooltipContent>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onToggleUnits}
-              data-testid="btn-toggle-units"
-              className="text-xs font-mono px-2"
-            >
-              {units === "metric" ? "m" : "ft"}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent><p>{units === "metric" ? "Switch to feet / sq ft" : "Switch to metres / m²"}</p></TooltipContent>
-        </Tooltip>
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid="btn-toggle-units"
+                  className="text-xs font-mono px-2"
+                >
+                  {UNIT_SHORT[units]}
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent><p>Change measurement units</p></TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end">
+            {(["m", "cm", "mm", "ft"] as UnitSystem[]).map((u) => (
+              <DropdownMenuItem key={u} onClick={() => onSetUnits(u)} className={units === u ? "font-semibold" : ""}>
+                <span className="font-mono w-6 inline-block">{UNIT_SHORT[u]}</span>
+                {UNIT_LABELS[u]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

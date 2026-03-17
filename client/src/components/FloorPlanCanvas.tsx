@@ -161,7 +161,7 @@ export default function FloorPlanCanvas({
     // Room areas with names
     const rooms = detectRooms(state.walls);
     const roomLabelPositions = rooms.length > 0
-      ? computeRoomLabelPositions(ctx, rooms, state.furniture, state.gridSize, state.zoom, state.roomNames)
+      ? computeRoomLabelPositions(ctx, rooms, state.furniture, state.gridSize, state.zoom, state.roomNames, state.units)
       : new Map<string, Point>();
     if (rooms.length > 0) {
       drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey, roomLabelPositions);
@@ -318,13 +318,28 @@ export default function FloorPlanCanvas({
     const x = 16;
     const y = h - 24;
 
-    // In imperial, show 1ft (0.3048m) instead of 1m
-    const barPx = units === "imperial" ? meterPx * 0.3048 : meterPx;
-    const barLabel = units === "imperial" ? "1 ft" : "1m";
-
-    // For imperial, use 3ft bar for better visibility
-    const displayPx = units === "imperial" ? meterPx * 0.9144 : meterPx;
-    const displayLabel = units === "imperial" ? "3 ft" : "1m";
+    // Choose scale bar length and label based on unit system
+    let displayPx: number;
+    let displayLabel: string;
+    switch (units) {
+      case "ft":
+        displayPx = meterPx * 0.9144; // 3 feet
+        displayLabel = "3 ft";
+        break;
+      case "cm":
+        displayPx = meterPx; // 100cm = 1m
+        displayLabel = "100cm";
+        break;
+      case "mm":
+        displayPx = meterPx * 0.5; // 500mm = 0.5m
+        displayLabel = "500mm";
+        break;
+      case "m":
+      default:
+        displayPx = meterPx;
+        displayLabel = "1m";
+        break;
+    }
 
     ctx.strokeStyle = isDark ? "#797876" : "#7a7974";
     ctx.lineWidth = 2;
@@ -888,7 +903,7 @@ export default function FloorPlanCanvas({
         // Check room labels first
         const rooms = detectRooms(state.walls);
         const roomLabelPos = rooms.length > 0
-          ? computeRoomLabelPositions(ctx, rooms, state.furniture, state.gridSize, state.zoom, state.roomNames)
+          ? computeRoomLabelPositions(ctx, rooms, state.furniture, state.gridSize, state.zoom, state.roomNames, state.units)
           : new Map<string, Point>();
         const hitRoom = hitTestRoomLabel(pos.x, pos.y, rooms, state.gridSize, state.zoom, state.panOffset, state.roomNames, roomLabelPos);
         if (hitRoom) {
