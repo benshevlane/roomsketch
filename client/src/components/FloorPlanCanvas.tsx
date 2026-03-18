@@ -128,7 +128,6 @@ export default function FloorPlanCanvas({
   const [isRotating, setIsRotating] = useState(false);
   const [rotateStartAngle, setRotateStartAngle] = useState(0);
   const [rotateItemStartRot, setRotateItemStartRot] = useState(0);
-
   // Component label dragging state
   const [isDraggingLabel, setIsDraggingLabel] = useState(false);
   const [draggingLabelId, setDraggingLabelId] = useState<string | null>(null);
@@ -469,6 +468,12 @@ export default function FloorPlanCanvas({
       const pos = getCanvasPos(e);
       setMousePos(pos);
 
+      // If editing a label, commit and close on any canvas click
+      if (editingLabel.id !== null || editingLabel.isNew || editingLabel.isRoomLabel) {
+        labelInputRef.current?.blur();
+        return;
+      }
+
       // Track pointer for pinch-to-zoom
       pointerCache.current.set(e.pointerId, e.nativeEvent);
       if (pointerCache.current.size === 2) {
@@ -584,6 +589,24 @@ export default function FloorPlanCanvas({
           return;
         }
 
+        // Check component label drag
+        if (state.componentLabelsVisible) {
+          const hitLabelItem = hitTestComponentLabel(pos.x, pos.y, componentLabelInfosRef.current);
+          if (hitLabelItem) {
+            const currentOffset = hitLabelItem.labelOffset || { x: 0, y: 0 };
+            setIsDraggingLabel(true);
+            setDraggingLabelId(hitLabelItem.id);
+            setLabelDragStart({
+              x: pos.x,
+              y: pos.y,
+              offsetX: currentOffset.x,
+              offsetY: currentOffset.y,
+            });
+            onSelectItem(hitLabelItem.id);
+            return;
+          }
+        }
+
         // Check arrow endpoint drag handles first for selected arrow
         const selectedArrow = state.arrows.find((a) => a.id === state.selectedItemId);
         if (selectedArrow) {
@@ -694,7 +717,7 @@ export default function FloorPlanCanvas({
         setTimeout(() => labelInputRef.current?.focus(), 0);
       }
     },
-    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onRemoveArrow, onPushUndo, onUpdateFurniture, onSplitWallAndConnect, onAddArrow, arrowDrawingStart, onSetLabelOffset]
+    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onRemoveArrow, onPushUndo, onUpdateFurniture, onSplitWallAndConnect, onAddArrow, arrowDrawingStart, onSetLabelOffset, editingLabel]
   );
 
   // Store world position for new labels

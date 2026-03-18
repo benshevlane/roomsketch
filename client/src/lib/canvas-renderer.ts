@@ -3686,11 +3686,12 @@ export function collectComponentLabelRects(
   const results: ComponentLabelInfo[] = [];
 
   for (const item of furniture) {
-    const centerX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
+    const baseCenterX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
     const centerY = (item.y + item.height / 2) * pxPerCm + panOffset.y;
     const itemWidthPx = item.width * pxPerCm;
     const itemHeightPx = item.height * pxPerCm;
     const isSelected = item.id === selectedId;
+    const centerX = baseCenterX;
 
     let labelX = centerX;
     let labelY: number;
@@ -3757,7 +3758,8 @@ function drawInsideComponentLabel(
   info: ComponentLabelInfo,
   pxPerCm: number,
   panOffset: Point,
-  isDark: boolean
+  isDark: boolean,
+  zoom: number = 1
 ) {
   const item = info.item;
   // Hide label when item is too small on screen
@@ -4060,7 +4062,7 @@ export function resolveAndDrawLabelCollisions(
     // Draw inside-component labels (not collision-resolved, anchored inside)
     for (const info of componentLabelInfos) {
       if (info.isInside) {
-        drawInsideComponentLabel(ctx, info, pxPerCm, panOffset, isDark);
+        drawInsideComponentLabel(ctx, info, pxPerCm, panOffset, isDark, zoom);
       }
     }
   }
