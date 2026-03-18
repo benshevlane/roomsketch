@@ -86,6 +86,31 @@ function pointInPolygon(p: Point, vertices: Point[]): boolean {
   return inside;
 }
 
+/** Determine which perpendicular direction points into the room interior using point-in-polygon test.
+ *  Works correctly for concave polygons (e.g. L-shaped rooms) unlike centroid-based dot product. */
+function computeInsideNormal(
+  wall: { start: Point; end: Point },
+  roomVertices: Point[],
+): { nx: number; ny: number } | null {
+  const dx = wall.end.x - wall.start.x;
+  const dy = wall.end.y - wall.start.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) return null;
+
+  const nx = -dy / len;
+  const ny = dx / len;
+  const midX = (wall.start.x + wall.end.x) / 2;
+  const midY = (wall.start.y + wall.end.y) / 2;
+  const EPS = 2; // 2 cm offset
+
+  const aInside = pointInPolygon({ x: midX + nx * EPS, y: midY + ny * EPS }, roomVertices);
+  const bInside = pointInPolygon({ x: midX - nx * EPS, y: midY - ny * EPS }, roomVertices);
+
+  if (aInside && !bInside) return { nx, ny };
+  if (bInside && !aInside) return { nx: -nx, ny: -ny };
+  return null;
+}
+
 /** Compute axis-aligned bounding box for a furniture item (world cm), accounting for rotation */
 function getFurnitureAABB(item: FurnitureItem): { minX: number; minY: number; maxX: number; maxY: number } {
   const cx = item.x + item.width / 2;
@@ -907,13 +932,12 @@ export function drawMeasurementIndicatorLines(
       }
     }
     if (bestRoom) {
-      const toCentroid = { x: bestRoom.centroid.x - wallMid.x, y: bestRoom.centroid.y - wallMid.y };
-      const dot = toCentroid.x * nx + toCentroid.y * ny;
-      if (dot < 0) {
-        insideNx = -nx;
-        insideNy = -ny;
+      const insideNormal = computeInsideNormal(wall, bestRoom.vertices);
+      if (insideNormal) {
+        insideNx = insideNormal.nx;
+        insideNy = insideNormal.ny;
+        foundRoom = true;
       }
-      foundRoom = true;
     }
 
     if (!foundRoom) {
@@ -1224,11 +1248,13 @@ function drawWallDimensionLabel(
         }
       }
       if (bestRoom) {
-        const toCentroid = { x: bestRoom.centroid.x - wallMid.x, y: bestRoom.centroid.y - wallMid.y };
-        const dot = toCentroid.x * wnx + toCentroid.y * wny;
-        insideNormX = dot >= 0 ? normX : -normX;
-        insideNormY = dot >= 0 ? normY : -normY;
-        foundRoom = true;
+        const insideNormal = computeInsideNormal(wall, bestRoom.vertices);
+        if (insideNormal) {
+          const dot = insideNormal.nx * normX + insideNormal.ny * normY;
+          insideNormX = dot >= 0 ? normX : -normX;
+          insideNormY = dot >= 0 ? normY : -normY;
+          foundRoom = true;
+        }
       }
 
       if (!foundRoom && allWalls.length > 0) {
