@@ -94,6 +94,7 @@ export default function Editor() {
 
   // Clipboard for copy/paste
   const clipboardRef = useRef<{ type: "furniture"; data: FurnitureItem } | { type: "label"; data: RoomLabel } | { type: "textbox"; data: TextBox } | null>(null);
+  const justPlacedFromLibraryRef = useRef(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
@@ -114,10 +115,18 @@ export default function Editor() {
   const hasSelection = !!(selectedWall || selectedFurniture || selectedLabel || selectedTextBox);
 
   // Auto-open properties sheet on mobile when something is selected
+  // (skip when item was just placed from the Items Library to avoid disruption)
   useEffect(() => {
     if (isMobile) {
-      if (hasSelection) setPropertiesPanelOpen(true);
-      else setPropertiesPanelOpen(false);
+      if (hasSelection) {
+        if (justPlacedFromLibraryRef.current) {
+          justPlacedFromLibraryRef.current = false;
+        } else {
+          setPropertiesPanelOpen(true);
+        }
+      } else {
+        setPropertiesPanelOpen(false);
+      }
     }
   }, [isMobile, hasSelection]);
 
@@ -567,8 +576,8 @@ export default function Editor() {
               <SheetContent side="left" className="p-0 w-72">
                 <SheetTitle className="sr-only">Items Library</SheetTitle>
                 <FurniturePanel
-                  className="w-full border-r-0"
-                  onSelectFurniture={(t) => { handleSelectFurniture(t); setFurniturePanelOpen(false); }}
+                  className="w-full h-full overflow-hidden border-r-0"
+                  onSelectFurniture={(t) => { justPlacedFromLibraryRef.current = true; handleSelectFurniture(t); setFurniturePanelOpen(false); }}
                   onSwitchToSelect={() => editor.setTool("select")}
                   onAddTextBox={() => { handleAddTextBox(); setFurniturePanelOpen(false); }}
                 />

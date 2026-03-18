@@ -15,6 +15,7 @@ import {
   drawDistanceMeasurements,
   drawEraserHighlight,
   collectComponentLabelRects,
+  collectWallDimensionLabelRects,
   resolveAndDrawLabelCollisions,
   findParallelWallDiscrepancies,
   drawWallLabelsWithDiscrepancy,
@@ -271,6 +272,12 @@ export default function FloorPlanCanvas({
       ? collectComponentLabelRects(ctx, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId, state.units)
       : [];
 
+    // Collect wall dimension label rects for collision resolution (labels are already drawn by drawWalls)
+    const wallLabelRects = collectWallDimensionLabelRects(
+      ctx, state.walls, state.gridSize, state.zoom, state.panOffset,
+      state.units, measureMode, state.furniture, rooms
+    );
+
     // Resize handles and distance measurements for selected furniture
     const selectedFurn = state.furniture.find((f) => f.id === state.selectedItemId);
     if (selectedFurn && state.selectedTool === "select") {
@@ -283,7 +290,7 @@ export default function FloorPlanCanvas({
       ctx, rooms, state.walls, componentLabelInfos, state.labels,
       state.gridSize, state.zoom, state.panOffset, isDark,
       state.roomNames, state.componentLabelsVisible, state.selectedItemId,
-      roomLabelPositions
+      roomLabelPositions, wallLabelRects
     );
 
     // Snap indicator and alignment guides when wall tool is active but not drawing yet

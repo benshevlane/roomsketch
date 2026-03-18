@@ -3086,6 +3086,158 @@ export interface ComponentLabelInfo {
   nameColor: string;
 }
 
+export interface WallLabelRect {
+  cx: number; // screen center x
+  cy: number; // screen center y
+  hw: number; // half-width (screen px)
+  hh: number; // half-height (screen px)
+}
+
+/** Collect screen-space bounding rects for wall dimension labels (without drawing them).
+ *  These are used as immovable anchors in the label collision system so that
+ *  component and freeform labels dodge wall measurements. */
+export function collectWallDimensionLabelRects(
+  ctx: CanvasRenderingContext2D,
+  walls: Wall[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  units: UnitSystem = "m",
+  measureMode: MeasureMode = "inside",
+  furniture: FurnitureItem[] = [],
+  rooms: DetectedRoom[] = []
+): WallLabelRect[] {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const results: WallLabelRect[] = [];
+
+  const collinearGroups = findCollinearGroups(walls);
+  const mergedWallIds = new Set<string>();
+  for (const group of collinearGroups.values()) {
+    for (const id of group.wallIds) mergedWallIds.add(id);
+  }
+
+  const collectOne = (
+    sx: number, sy: number, ex: number, ey: number,
+    lengthCm: number, wallThicknessPx: number,
+    wall: Wall
+  ) => {
+    const angle = Math.atan2(ey - sy, ex - sx);
+    const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
+
+    const baseFontSize = Math.max(11, 12 * zoom);
+    const text = formatLength(lengthCm, units);
+    ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const textWidth = ctx.measureText(text).width;
+    const pad = 4;
+
+    let labelFrac = 0.5;
+    const occupants = findComponentsOnWall(wall, furniture, gridSize, zoom, panOffset);
+    if (occupants.length > 0) {
+      const textFrac = wallLengthPx > 0 ? (textWidth + pad * 2) / wallLengthPx : 1;
+      const result = findOptimalLabelPosition(occupants, textFrac);
+      labelFrac = result.position;
+    }
+
+    const mx = sx + (ex - sx) * labelFrac;
+    const my = sy + (ey - sy) * labelFrac;
+
+    // Compute inside normal (same as drawWallDimensionLabel)
+    const normX = -Math.sin(angle);
+    const normY = Math.cos(angle);
+    let insideNormX = normX;
+    let insideNormY = normY;
+
+    const wallMid = { x: (wall.start.x + wall.end.x) / 2, y: (wall.start.y + wall.end.y) / 2 };
+    const wdx = wall.end.x - wall.start.x;
+    const wdy = wall.end.y - wall.start.y;
+    const wlen = Math.sqrt(wdx * wdx + wdy * wdy);
+    if (wlen > 0) {
+      const wnx = -wdy / wlen;
+      const wny = wdx / wlen;
+
+      let bestRoom: DetectedRoom | null = null;
+      for (const room of rooms) {
+        const hasStart = room.vertices.some(v =>
+          Math.sqrt((v.x - wall.start.x) ** 2 + (v.y - wall.start.y) ** 2) < 15
+        );
+        const hasEnd = room.vertices.some(v =>
+          Math.sqrt((v.x - wall.end.x) ** 2 + (v.y - wall.end.y) ** 2) < 15
+        );
+        if (hasStart && hasEnd) {
+          if (!bestRoom || room.area > bestRoom.area) bestRoom = room;
+        }
+      }
+      if (bestRoom) {
+        const toCentroid = { x: bestRoom.centroid.x - wallMid.x, y: bestRoom.centroid.y - wallMid.y };
+        const dot = toCentroid.x * wnx + toCentroid.y * wny;
+        insideNormX = dot >= 0 ? normX : -normX;
+        insideNormY = dot >= 0 ? normY : -normY;
+      } else if (walls.length > 0) {
+        let cx = 0, cy = 0, cnt = 0;
+        for (const w of walls) {
+          cx += w.start.x + w.end.x;
+          cy += w.start.y + w.end.y;
+          cnt += 2;
+        }
+        if (cnt > 0) {
+          cx /= cnt; cy /= cnt;
+          const toCentroid = { x: cx - wallMid.x, y: cy - wallMid.y };
+          const dot = toCentroid.x * wnx + toCentroid.y * wny;
+          insideNormX = dot >= 0 ? normX : -normX;
+          insideNormY = dot >= 0 ? normY : -normY;
+        }
+      }
+    }
+
+    const dirSign = measureMode === "inside" ? 1 : -1;
+    const perpOffsetPx = dirSign * (wallThicknessPx / 2 + baseFontSize * 0.6 + 4);
+    const finalX = mx + insideNormX * perpOffsetPx;
+    const finalY = my + insideNormY * perpOffsetPx;
+
+    results.push({
+      cx: finalX,
+      cy: finalY,
+      hw: textWidth / 2 + pad,
+      hh: baseFontSize * 0.5 + pad,
+    });
+  };
+
+  // Non-merged walls
+  walls.forEach((wall) => {
+    if (mergedWallIds.has(wall.id)) return;
+    const wallThick = wall.thickness || 15;
+    const sx = wall.start.x * pxPerCm + panOffset.x;
+    const sy = wall.start.y * pxPerCm + panOffset.y;
+    const ex = wall.end.x * pxPerCm + panOffset.x;
+    const ey = wall.end.y * pxPerCm + panOffset.y;
+    const dx = wall.end.x - wall.start.x;
+    const dy = wall.end.y - wall.start.y;
+    const lengthCm = Math.sqrt(dx * dx + dy * dy);
+    const displayLengthCm = measureMode === "inside"
+      ? Math.max(0, lengthCm - wallThick)
+      : lengthCm;
+    if (lengthCm > 10) {
+      collectOne(sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, wall);
+    }
+  });
+
+  // Merged collinear groups
+  for (const group of collinearGroups.values()) {
+    const thickness = walls[0]?.thickness ?? 15;
+    const sx = group.minP.x * pxPerCm + panOffset.x;
+    const sy = group.minP.y * pxPerCm + panOffset.y;
+    const ex = group.maxP.x * pxPerCm + panOffset.x;
+    const ey = group.maxP.y * pxPerCm + panOffset.y;
+    const displayLengthCm = measureMode === "inside"
+      ? Math.max(0, group.totalLengthCm - thickness)
+      : group.totalLengthCm;
+    const representativeWall = walls.find((w) => group.wallIds.has(w.id)) || walls[0];
+    collectOne(sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, representativeWall);
+  }
+
+  return results;
+}
+
 /** Measure component labels without drawing — returns info needed for deferred rendering */
 export function collectComponentLabelRects(
   ctx: CanvasRenderingContext2D,
@@ -3257,7 +3409,8 @@ export function resolveAndDrawLabelCollisions(
   roomNames: Record<string, string>,
   componentLabelsVisible: boolean,
   selectedId: string | null,
-  labelPositions: Map<string, Point> = new Map()
+  labelPositions: Map<string, Point> = new Map(),
+  wallLabelRects: WallLabelRect[] = []
 ): void {
   // Collect all label rects with priority
   const allRects: LabelRect[] = [];
@@ -3278,6 +3431,14 @@ export function resolveAndDrawLabelCollisions(
     allRects.push({
       x: cx, y: cy, w: nameW / 2 + 4, h: totalH / 2 + 2,
       priority: 0, anchorX: cx, anchorY: cy, sourceIndex: -1,
+    });
+  }
+
+  // Wall dimension labels (priority 1) — immovable anchors, already drawn by drawWalls
+  for (const wl of wallLabelRects) {
+    allRects.push({
+      x: wl.cx, y: wl.cy, w: wl.hw + 2, h: wl.hh + 2,
+      priority: 1, anchorX: wl.cx, anchorY: wl.cy, sourceIndex: -1,
     });
   }
 
