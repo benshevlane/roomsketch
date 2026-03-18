@@ -40,6 +40,20 @@ function generateId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
+/** Deep copy editor state so undo/redo stacks don't share object references */
+function deepCopyState(s: EditorState): EditorState {
+  return {
+    ...s,
+    walls: s.walls.map(w => ({ ...w, start: { ...w.start }, end: { ...w.end } })),
+    furniture: s.furniture.map(f => ({ ...f, labelOffset: f.labelOffset ? { ...f.labelOffset } : undefined })),
+    labels: s.labels.map(l => ({ ...l })),
+    textBoxes: s.textBoxes.map(t => ({ ...t })),
+    arrows: s.arrows.map(a => ({ ...a })),
+    roomNames: { ...s.roomNames },
+    panOffset: { ...s.panOffset },
+  };
+}
+
 /** Component types whose labels should render inside the component rectangle */
 const LABEL_INSIDE_TYPES = new Set([
   "worktop", "island", "fridge", "dishwasher",
@@ -95,7 +109,7 @@ export function useEditor() {
 
   const pushUndo = useCallback(() => {
     setState((s) => {
-      undoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], textBoxes: [...s.textBoxes], arrows: [...s.arrows], roomNames: { ...s.roomNames } });
+      undoStack.current.push(deepCopyState(s));
       redoStack.current = [];
       if (undoStack.current.length > 50) undoStack.current.shift();
       return s;
@@ -106,7 +120,7 @@ export function useEditor() {
     if (undoStack.current.length === 0) return;
     const prev = undoStack.current.pop()!;
     setState((s) => {
-      redoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], textBoxes: [...s.textBoxes], arrows: [...s.arrows], roomNames: { ...s.roomNames } });
+      redoStack.current.push(deepCopyState(s));
       return prev;
     });
   }, []);
@@ -115,7 +129,7 @@ export function useEditor() {
     if (redoStack.current.length === 0) return;
     const next = redoStack.current.pop()!;
     setState((s) => {
-      undoStack.current.push({ ...s, walls: [...s.walls], furniture: [...s.furniture], labels: [...s.labels], textBoxes: [...s.textBoxes], arrows: [...s.arrows], roomNames: { ...s.roomNames } });
+      undoStack.current.push(deepCopyState(s));
       return next;
     });
   }, []);
