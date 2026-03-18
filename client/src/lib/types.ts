@@ -25,6 +25,7 @@ export interface FurnitureItem {
   category: string;
   customName?: string; // user-renamed label, persists across sessions
   heightFromFloor?: number; // in cm, used for wall cupboards (default 145)
+  mirrored?: boolean; // horizontally flipped (for mirrorable items like L-Shape Sofa)
 }
 
 export type LabelSize = "small" | "medium" | "large";
@@ -201,6 +202,8 @@ export interface FurnitureTemplate {
   icon: string;
   isWallCupboard?: boolean;
   defaultHeightFromFloor?: number; // in cm
+  mirrorable?: boolean; // can be horizontally flipped (e.g. L-Shape Sofa)
+  rotationSnap?: number; // rotation increment in degrees (default 90)
 }
 
 export const WALL_CUPBOARD_TYPES = ["wall_cupboard_single", "wall_cupboard_double", "wall_cupboard_corner"];
@@ -210,45 +213,56 @@ export function isWallCupboard(type: string): boolean {
 }
 
 export const FURNITURE_LIBRARY: FurnitureTemplate[] = [
-  // Living Room
-  { type: "sofa_3", label: "3-Seat Sofa", width: 220, height: 90, category: "Living", icon: "sofa" },
-  { type: "sofa_2", label: "2-Seat Sofa", width: 160, height: 85, category: "Living", icon: "sofa" },
-  { type: "armchair", label: "Armchair", width: 85, height: 85, category: "Living", icon: "armchair" },
-  { type: "coffee_table", label: "Coffee Table", width: 120, height: 60, category: "Living", icon: "square" },
-  { type: "tv_unit", label: "TV Unit", width: 160, height: 45, category: "Living", icon: "tv" },
-  { type: "bookshelf", label: "Bookshelf", width: 120, height: 35, category: "Living", icon: "book-open" },
-  // Kitchen
-  { type: "counter", label: "Counter", width: 60, height: 60, category: "Kitchen", icon: "chef-hat" },
-  { type: "sink_k", label: "Kitchen Sink", width: 60, height: 60, category: "Kitchen", icon: "droplets" },
+  // Kitchen (ordered: Worktop → Sink(s) → Sink(d) → Cooker/Hob → Range Cooker → Fridge → Dishwasher → Oven → Island → Extractor Hood → Washing Machine → Tumble Dryer → Wall Cupboards → Boiler)
+  { type: "worktop", label: "Worktop", width: 200, height: 60, category: "Kitchen", icon: "chef-hat" },
+  { type: "kitchen_sink_s", label: "Kitchen Sink (single)", width: 60, height: 60, category: "Kitchen", icon: "droplets" },
+  { type: "kitchen_sink_d", label: "Kitchen Sink (double)", width: 120, height: 60, category: "Kitchen", icon: "droplets" },
   { type: "cooker", label: "Cooker/Hob", width: 60, height: 60, category: "Kitchen", icon: "flame" },
+  { type: "range_cooker", label: "Range Cooker", width: 100, height: 60, category: "Kitchen", icon: "flame" },
   { type: "fridge", label: "Fridge", width: 60, height: 65, category: "Kitchen", icon: "refrigerator" },
   { type: "dishwasher", label: "Dishwasher", width: 60, height: 60, category: "Kitchen", icon: "waves" },
+  { type: "oven_builtin", label: "Oven (built-in)", width: 60, height: 60, category: "Kitchen", icon: "flame" },
   { type: "island", label: "Kitchen Island", width: 180, height: 90, category: "Kitchen", icon: "layout-grid" },
+  { type: "extractor_hood", label: "Extractor Hood", width: 60, height: 50, category: "Kitchen", icon: "chef-hat" },
+  { type: "washing_machine", label: "Washing Machine", width: 60, height: 60, category: "Kitchen", icon: "waves" },
+  { type: "tumble_dryer", label: "Tumble Dryer", width: 60, height: 60, category: "Kitchen", icon: "waves" },
   { type: "wall_cupboard_single", label: "Wall Cupboard (single)", width: 60, height: 35, category: "Kitchen", icon: "square", isWallCupboard: true, defaultHeightFromFloor: 145 },
   { type: "wall_cupboard_double", label: "Wall Cupboard (double)", width: 100, height: 35, category: "Kitchen", icon: "square", isWallCupboard: true, defaultHeightFromFloor: 145 },
   { type: "wall_cupboard_corner", label: "Corner Wall Cupboard", width: 90, height: 90, category: "Kitchen", icon: "square", isWallCupboard: true, defaultHeightFromFloor: 145 },
-  // Bedroom
+  { type: "boiler", label: "Boiler", width: 60, height: 60, category: "Kitchen", icon: "flame" },
+  // Living (ordered: 3-Seat Sofa → 2-Seat Sofa → L-Shape Sofa → Armchair → Coffee Table → Side Table → TV Unit → Bookshelf → Fireplace)
+  { type: "sofa_3", label: "3-Seat Sofa", width: 220, height: 90, category: "Living", icon: "sofa" },
+  { type: "sofa_2", label: "2-Seat Sofa", width: 160, height: 85, category: "Living", icon: "sofa" },
+  { type: "sofa_l", label: "L-Shape Sofa", width: 260, height: 170, category: "Living", icon: "sofa", mirrorable: true },
+  { type: "armchair", label: "Armchair", width: 85, height: 85, category: "Living", icon: "armchair" },
+  { type: "coffee_table", label: "Coffee Table", width: 120, height: 60, category: "Living", icon: "square" },
+  { type: "side_table", label: "Side Table", width: 50, height: 50, category: "Living", icon: "square" },
+  { type: "tv_unit", label: "TV Unit", width: 160, height: 45, category: "Living", icon: "tv" },
+  { type: "bookshelf", label: "Bookshelf", width: 120, height: 35, category: "Living", icon: "book-open" },
+  { type: "fireplace", label: "Fireplace / Stove", width: 120, height: 40, category: "Living", icon: "flame" },
+  // Bedroom (ordered: Super King Bed → King Bed → Double Bed → Single Bed → Wardrobe)
+  { type: "bed_superking", label: "Super King Bed", width: 200, height: 200, category: "Bedroom", icon: "bed-double" },
+  { type: "bed_king", label: "King Bed", width: 180, height: 200, category: "Bedroom", icon: "bed-double" },
   { type: "bed_double", label: "Double Bed", width: 140, height: 200, category: "Bedroom", icon: "bed-double" },
   { type: "bed_single", label: "Single Bed", width: 90, height: 200, category: "Bedroom", icon: "bed-single" },
-  { type: "bed_king", label: "King Bed", width: 160, height: 200, category: "Bedroom", icon: "bed-double" },
   { type: "wardrobe", label: "Wardrobe", width: 120, height: 60, category: "Bedroom", icon: "shirt" },
-  { type: "nightstand", label: "Nightstand", width: 50, height: 40, category: "Bedroom", icon: "lamp" },
-  { type: "desk", label: "Desk", width: 120, height: 60, category: "Bedroom", icon: "monitor" },
-  // Bathroom
+  // Bathroom (ordered: Bath → Toilet → Shower → Basin/Pedestal)
   { type: "bathtub", label: "Bathtub", width: 170, height: 75, category: "Bathroom", icon: "bath" },
-  { type: "shower", label: "Shower Encl.", width: 90, height: 90, category: "Bathroom", icon: "shower-head" },
   { type: "toilet", label: "Toilet", width: 40, height: 65, category: "Bathroom", icon: "circle" },
-  { type: "basin", label: "Basin", width: 55, height: 45, category: "Bathroom", icon: "droplets" },
-  // Dining
+  { type: "shower", label: "Shower Encl.", width: 90, height: 90, category: "Bathroom", icon: "shower-head" },
+  { type: "basin_pedestal", label: "Basin / Pedestal", width: 60, height: 45, category: "Bathroom", icon: "droplets" },
+  // Dining (ordered: Dining Table (4) → Dining Table (6) → Dining Chair)
   { type: "dining_table_4", label: "Dining Table (4)", width: 120, height: 80, category: "Dining", icon: "utensils" },
   { type: "dining_table_6", label: "Dining Table (6)", width: 180, height: 90, category: "Dining", icon: "utensils" },
-  { type: "dining_chair", label: "Dining Chair", width: 45, height: 45, category: "Dining", icon: "armchair" },
-  // Structure
+  { type: "dining_chair", label: "Dining Chair", width: 45, height: 45, category: "Dining", icon: "armchair", rotationSnap: 45 },
+  // Office (ordered: Desk → Office Chair)
+  { type: "desk", label: "Desk", width: 140, height: 70, category: "Office", icon: "monitor" },
+  { type: "office_chair", label: "Office Chair", width: 60, height: 60, category: "Office", icon: "armchair" },
+  // Structure (ordered: Staircase → Radiator → Window → Door → Double Door)
+  { type: "stairs", label: "Staircase", width: 90, height: 250, category: "Structure", icon: "arrow-up" },
+  { type: "radiator", label: "Radiator", width: 120, height: 60, category: "Structure", icon: "thermometer" },
+  { type: "window", label: "Window", width: 100, height: 15, category: "Structure", icon: "square" },
   { type: "door", label: "Door", width: 90, height: 15, category: "Structure", icon: "door-open" },
   { type: "door_double", label: "Double Door", width: 150, height: 15, category: "Structure", icon: "door-open" },
-  { type: "window", label: "Window", width: 100, height: 15, category: "Structure", icon: "square" },
   { type: "bay_window", label: "Bay Window", width: 180, height: 60, category: "Structure", icon: "square" },
-  { type: "stairs", label: "Staircase", width: 90, height: 250, category: "Structure", icon: "arrow-up" },
-  { type: "radiator", label: "Radiator", width: 100, height: 15, category: "Structure", icon: "thermometer" },
-  { type: "boiler", label: "Boiler", width: 60, height: 60, category: "Kitchen", icon: "flame" },
 ];

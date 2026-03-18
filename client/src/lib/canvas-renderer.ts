@@ -1189,6 +1189,7 @@ export function drawFurniture(
     ctx.save();
     ctx.translate(x + w / 2, y + h / 2);
     ctx.rotate((item.rotation * Math.PI) / 180);
+    if (item.mirrored) ctx.scale(-1, 1);
 
     const isSelected = item.id === selectedId;
     const isWallCup = isWallCupboard(item.type);
@@ -1278,7 +1279,18 @@ function drawFurnitureDetail(
       break;
     case "bed_double":
     case "bed_king":
-    case "bed_single":
+    case "bed_superking":
+    case "bed_single": {
+      // Headboard fill
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.12;
+      ctx.fillRect(-w / 2, -h / 2, w, h * 0.27);
+      ctx.globalAlpha = 1;
+      // Divider line below headboard
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h / 2 + h * 0.29);
+      ctx.lineTo(w / 2, -h / 2 + h * 0.29);
+      ctx.stroke();
       // Pillow(s)
       const pw = type === "bed_single" ? w * 0.7 : w * 0.38;
       const ph = h * 0.1;
@@ -1290,6 +1302,7 @@ function drawFurnitureDetail(
         ctx.strokeRect(w * 0.42 - pw, py, pw, ph);
       }
       break;
+    }
     case "cooker":
       // Four burners
       const br = Math.min(w, h) * 0.14;
@@ -1306,11 +1319,66 @@ function drawFurnitureDetail(
       ctx.arc(w * 0.2, h * 0.2, br, 0, Math.PI * 2);
       ctx.stroke();
       break;
-    case "sink_k":
+    case "kitchen_sink_s": {
+      // Single basin with tap and drainer lines
+      ctx.strokeRect(-w * 0.32, -h * 0.36, w * 0.64, h * 0.54);
       ctx.beginPath();
-      ctx.ellipse(0, 0, w * 0.3, h * 0.3, 0, 0, Math.PI * 2);
+      ctx.arc(0, -h * 0.09, w * 0.05, 0, Math.PI * 2);
+      ctx.fillStyle = stroke;
+      ctx.fill();
+      // Tap
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.12, -h * 0.42);
+      ctx.lineTo(w * 0.12, -h * 0.42);
       ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, -h * 0.46);
+      ctx.lineTo(0, -h * 0.35);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Drainer lines
+      ctx.globalAlpha = 0.35;
+      for (const xf of [0.2, 0.35, 0.5, 0.65, 0.8]) {
+        ctx.beginPath();
+        ctx.moveTo(-w / 2 + w * xf, h * 0.26);
+        ctx.lineTo(-w / 2 + w * xf, h * 0.46);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
       break;
+    }
+    case "kitchen_sink_d": {
+      // Double sink: two basins left + drying rack right
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(w * 0.15, -h / 2);
+      ctx.lineTo(w * 0.15, h / 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Left basin
+      ctx.strokeRect(-w * 0.45, -h * 0.38, w * 0.25, h * 0.65);
+      // Right basin
+      ctx.strokeRect(-w * 0.15, -h * 0.38, w * 0.25, h * 0.65);
+      // Drain dots
+      ctx.fillStyle = stroke;
+      ctx.beginPath();
+      ctx.arc(-w * 0.33, -h * 0.05, w * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(-w * 0.03, -h * 0.05, w * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+      // Drying rack slats
+      ctx.globalAlpha = 0.4;
+      for (const xf of [0.2, 0.28, 0.36, 0.44]) {
+        ctx.beginPath();
+        ctx.moveTo(w * xf, -h * 0.36);
+        ctx.lineTo(w * xf, h * 0.36);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      break;
+    }
     case "sofa_3":
     case "sofa_2":
       // Back
@@ -1458,6 +1526,250 @@ function drawFurnitureDetail(
         ctx.stroke();
       }
       break;
+    case "range_cooker": {
+      // 6 burners in 3×2 grid
+      const rMin = Math.min(w, h);
+      for (const cx of [0.18, 0.5, 0.82]) {
+        for (const cy of [0.32, 0.72]) {
+          const bx = -w / 2 + w * cx;
+          const by = -h / 2 + h * cy;
+          ctx.beginPath();
+          ctx.arc(bx, by, rMin * 0.14, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = stroke;
+          ctx.globalAlpha = 0.45;
+          ctx.beginPath();
+          ctx.arc(bx, by, rMin * 0.045, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      }
+      break;
+    }
+    case "oven_builtin": {
+      // Control strip top + oven window + handle
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.15;
+      ctx.fillRect(-w / 2, -h / 2, w, h * 0.22);
+      ctx.globalAlpha = 0.5;
+      for (const xf of [0.25, 0.5, 0.75]) {
+        ctx.beginPath();
+        ctx.arc(-w / 2 + w * xf, -h / 2 + h * 0.11, h * 0.045, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 0.08;
+      ctx.fillRect(-w * 0.38, -h / 2 + h * 0.3, w * 0.76, h * 0.46);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.38, -h / 2 + h * 0.3, w * 0.76, h * 0.46);
+      // Handle
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.3, -h / 2 + h * 0.88);
+      ctx.lineTo(w * 0.3, -h / 2 + h * 0.88);
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "extractor_hood": {
+      // Trapezoid shape with duct and grille
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.1;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.25, -h / 2);
+      ctx.lineTo(w * 0.25, -h / 2);
+      ctx.lineTo(w / 2, h / 2);
+      ctx.lineTo(-w / 2, h / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.stroke();
+      // Duct at top
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(-w * 0.15, -h / 2, w * 0.3, h * 0.2);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.15, -h / 2, w * 0.3, h * 0.2);
+      // Grille lines
+      ctx.globalAlpha = 0.45;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.38, h * 0.15);
+      ctx.lineTo(w * 0.38, h * 0.15);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.32, h * 0.32);
+      ctx.lineTo(w * 0.32, h * 0.32);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "tumble_dryer":
+      // Dashed border to distinguish from washing machine
+      ctx.setLineDash([6, 3]);
+      ctx.strokeRect(-w * 0.46, -h * 0.46, w * 0.92, h * 0.92);
+      ctx.setLineDash([]);
+      break;
+    case "washing_machine":
+    case "worktop":
+      // Plain rectangle — no inner detail (outer rect already drawn)
+      break;
+    case "sofa_l": {
+      // L-shape: back rail top + right, left arm, seat area, cushion divider
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.28;
+      ctx.fillRect(-w / 2, -h / 2, w * 0.72, h * 0.14);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w / 2, -h / 2, w * 0.72, h * 0.14);
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.28;
+      ctx.fillRect(w / 2 - w * 0.16, -h / 2 + h * 0.16, w * 0.16, h * 0.62);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(w / 2 - w * 0.16, -h / 2 + h * 0.16, w * 0.16, h * 0.62);
+      // Left arm
+      ctx.strokeRect(-w / 2, -h / 2 + h * 0.16, w * 0.1, h * 0.62);
+      // Seat area
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.08;
+      ctx.fillRect(-w / 2 + w * 0.1, -h / 2 + h * 0.16, w * 0.72, h * 0.62);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w / 2 + w * 0.1, -h / 2 + h * 0.16, w * 0.72, h * 0.62);
+      // Cushion divider
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2 + w * 0.44, -h / 2 + h * 0.16);
+      ctx.lineTo(-w / 2 + w * 0.44, -h / 2 + h * 0.78);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "side_table": {
+      // Circular top-down: outer circle + inner ring + center dot
+      const r = Math.min(w, h) / 2 - 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath();
+      ctx.arc(0, 0, r / 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = stroke;
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.min(w, h) * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "fireplace": {
+      // Wall surround top + firebox + hearth
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.2;
+      ctx.fillRect(-w / 2, -h / 2, w, h * 0.45);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w / 2, -h / 2, w, h * 0.45);
+      // Firebox
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.28;
+      ctx.fillRect(-w * 0.3, -h / 2 + h * 0.06, w * 0.6, h * 0.34);
+      ctx.globalAlpha = 1;
+      // Hearth projection
+      ctx.globalAlpha = 0.5;
+      ctx.strokeRect(-w * 0.4, -h / 2 + h * 0.48, w * 0.8, h * 0.48);
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "basin_pedestal": {
+      // D-shaped bowl + drain + pedestal column + base
+      ctx.beginPath();
+      const bpTop = -h / 2 + h * 0.08;
+      ctx.moveTo(-w * 0.42, bpTop);
+      ctx.quadraticCurveTo(-w * 0.42, -h / 2 + h * 0.52, 0, -h / 2 + h * 0.52);
+      ctx.quadraticCurveTo(w * 0.42, -h / 2 + h * 0.52, w * 0.42, bpTop);
+      ctx.closePath();
+      ctx.stroke();
+      // Top edge
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.42, bpTop);
+      ctx.lineTo(w * 0.42, bpTop);
+      ctx.stroke();
+      // Drain dot
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.arc(0, -h / 2 + h * 0.34, w * 0.05, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      // Pedestal column
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.15;
+      ctx.fillRect(-w * 0.12, -h / 2 + h * 0.53, w * 0.24, h * 0.27);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.12, -h / 2 + h * 0.53, w * 0.24, h * 0.27);
+      // Base
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.2;
+      ctx.fillRect(-w * 0.26, -h / 2 + h * 0.8, w * 0.52, h * 0.14);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.26, -h / 2 + h * 0.8, w * 0.52, h * 0.14);
+      break;
+    }
+    case "dining_chair": {
+      // Backrest bar at top + seat rectangle
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.3;
+      ctx.fillRect(-w * 0.42, -h / 2, w * 0.84, h * 0.22);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.42, -h / 2, w * 0.84, h * 0.22);
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.08;
+      ctx.fillRect(-w * 0.42, -h / 2 + h * 0.28, w * 0.84, h * 0.66);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.42, -h / 2 + h * 0.28, w * 0.84, h * 0.66);
+      break;
+    }
+    case "desk": {
+      // Rectangle + monitor outline + keyboard strip
+      ctx.strokeRect(-w * 0.22, -h * 0.34, w * 0.44, h * 0.42);
+      // Monitor stand
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.08);
+      ctx.lineTo(0, h * 0.22);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.12, h * 0.22);
+      ctx.lineTo(w * 0.12, h * 0.22);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Keyboard
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.2;
+      ctx.fillRect(-w * 0.26, h * 0.28, w * 0.52, h * 0.12);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.26, h * 0.28, w * 0.52, h * 0.12);
+      break;
+    }
+    case "office_chair": {
+      // Round seat + backrest nub at top
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.28;
+      ctx.fillRect(-w * 0.2, -h / 2, w * 0.4, h * 0.18);
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(-w * 0.2, -h / 2, w * 0.4, h * 0.18);
+      // Circular seat
+      const chairR = Math.min(w, h) * 0.36;
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.08;
+      ctx.beginPath();
+      ctx.arc(0, h * 0.12, chairR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(0, h * 0.12, chairR, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
     case "boiler":
       // Boiler: rectangle with circle containing "B"
       ctx.lineWidth = 1;
