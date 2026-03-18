@@ -2042,7 +2042,8 @@ export function drawRoomAreas(
   units: UnitSystem = "m",
   roomNames: Record<string, string> = {},
   selectedRoomKey: string | null = null,
-  labelPositions: Map<string, Point> = new Map()
+  labelPositions: Map<string, Point> = new Map(),
+  roomLabelOffsets: Record<string, Point> = {}
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -2066,7 +2067,11 @@ export function drawRoomAreas(
 
     // Draw room name + area text at resolved position (or centroid fallback)
     const roomKey = getRoomKey(room);
-    const labelPos = labelPositions.get(roomKey) || room.centroid;
+    const basePos = labelPositions.get(roomKey) || room.centroid;
+    const userOffset = roomLabelOffsets[roomKey];
+    const labelPos = userOffset
+      ? { x: basePos.x + userOffset.x, y: basePos.y + userOffset.y }
+      : basePos;
     const cx = labelPos.x * pxPerCm + panOffset.x;
     const cy = labelPos.y * pxPerCm + panOffset.y;
     const roomName = roomNames[roomKey] || "Room";
@@ -2140,13 +2145,18 @@ export function hitTestRoomLabel(
   zoom: number,
   panOffset: Point,
   roomNames: Record<string, string>,
-  labelPositions: Map<string, Point> = new Map()
+  labelPositions: Map<string, Point> = new Map(),
+  roomLabelOffsets: Record<string, Point> = {}
 ): { roomKey: string; centroid: Point } | null {
   const pxPerCm = (gridSize * zoom) / 100;
 
   for (const room of rooms) {
     const roomKey = getRoomKey(room);
-    const labelPos = labelPositions.get(roomKey) || room.centroid;
+    const basePos = labelPositions.get(roomKey) || room.centroid;
+    const userOffset = roomLabelOffsets[roomKey];
+    const labelPos = userOffset
+      ? { x: basePos.x + userOffset.x, y: basePos.y + userOffset.y }
+      : basePos;
     const cx = labelPos.x * pxPerCm + panOffset.x;
     const cy = labelPos.y * pxPerCm + panOffset.y;
     const roomName = roomNames[roomKey] || "Room";
