@@ -14,9 +14,10 @@ import {
   GripVertical,
   DoorOpen,
   TextCursorInput,
+  Monitor,
 } from "lucide-react";
 
-const CATEGORIES = ["All", "Living", "Kitchen", "Bedroom", "Bathroom", "Dining", "Structure"];
+const CATEGORIES = ["All", "Kitchen", "Living", "Bedroom", "Bathroom", "Dining", "Office", "Structure"];
 
 const CATEGORY_ICONS: Record<string, typeof Sofa> = {
   Living: Sofa,
@@ -24,6 +25,7 @@ const CATEGORY_ICONS: Record<string, typeof Sofa> = {
   Bedroom: BedDouble,
   Bathroom: Bath,
   Dining: UtensilsCrossed,
+  Office: Monitor,
   Structure: DoorOpen,
 };
 
@@ -67,21 +69,26 @@ export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect, on
   });
   const [search, setSearch] = useState("");
 
+  const isDoorOrWindow = (type: string) =>
+    type === "door" || type === "door_double" || type === "window";
+
   const filtered = FURNITURE_LIBRARY.filter((item) => {
-    const isDoorWindow = item.type === "door" || item.type === "window";
     // When searching, ignore category filter so results span all categories
     if (search) {
       return item.label.toLowerCase().includes(search.toLowerCase());
     }
     // Doors & windows always appear regardless of selected category
-    if (isDoorWindow) return true;
+    if (isDoorOrWindow(item.type)) return true;
     if (selectedCategory !== "All" && item.category !== selectedCategory) return false;
     return true;
   }).sort((a, b) => {
-    // Doors & windows always float to the top of every list
-    const aIsStructure = a.type === "door" || a.type === "window" ? 0 : 1;
-    const bIsStructure = b.type === "door" || b.type === "window" ? 0 : 1;
-    return aIsStructure - bIsStructure;
+    // For Structure category, preserve array order (don't float doors/windows)
+    if (selectedCategory === "Structure") return 0;
+    // For all other categories, float Window → Door → Double Door to top
+    const doorWindowOrder: Record<string, number> = { window: 0, door: 1, door_double: 2 };
+    const aOrder = isDoorOrWindow(a.type) ? doorWindowOrder[a.type] ?? 0 : 10;
+    const bOrder = isDoorOrWindow(b.type) ? doorWindowOrder[b.type] ?? 0 : 10;
+    return aOrder - bOrder;
   });
 
   const handleDragStart = (e: React.DragEvent, template: FurnitureTemplate) => {

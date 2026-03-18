@@ -1,9 +1,9 @@
-import { Wall, WallType, FurnitureItem, RoomLabel, TextBox, Arrow, ArrowStyle, ArrowHeadStyle, LabelSize, LabelColor, UnitSystem, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix } from "../lib/types";
+import { Wall, WallType, FurnitureItem, RoomLabel, TextBox, Arrow, ArrowStyle, ArrowHeadStyle, LabelSize, LabelColor, UnitSystem, isWallCupboard, cmToDisplay, displayToCm, dimensionSuffix, FURNITURE_LIBRARY } from "../lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { RotateCw, Trash2, Ruler, Copy, Bold, Square } from "lucide-react";
+import { RotateCw, Trash2, Ruler, Copy, Bold, Square, FlipHorizontal } from "lucide-react";
 
 interface PropertiesPanelProps {
   selectedWall: Wall | null;
@@ -12,6 +12,7 @@ interface PropertiesPanelProps {
   selectedTextBox: TextBox | null;
   selectedArrow: Arrow | null;
   onRotate: () => void;
+  onMirror?: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onUpdateFurniture: (id: string, updates: Partial<FurnitureItem>) => void;
@@ -59,6 +60,7 @@ export default function PropertiesPanel({
   selectedTextBox,
   selectedArrow,
   onRotate,
+  onMirror,
   onDelete,
   onDuplicate,
   onUpdateFurniture,
@@ -227,6 +229,11 @@ export default function PropertiesPanel({
             <RotateCw className="h-3.5 w-3.5 mr-1" />
             Rotate
           </Button>
+          {onMirror && FURNITURE_LIBRARY.find((t) => t.type === selectedFurniture.type)?.mirrorable && (
+            <Button size="sm" variant="secondary" onClick={onMirror} className="min-h-[44px] md:min-h-0" data-testid="btn-mirror-furniture">
+              <FlipHorizontal className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button size="sm" variant="secondary" onClick={onDuplicate} className="min-h-[44px] md:min-h-0" data-testid="btn-duplicate-furniture">
             <Copy className="h-3.5 w-3.5" />
           </Button>

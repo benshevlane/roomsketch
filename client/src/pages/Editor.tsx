@@ -273,6 +273,10 @@ export default function Editor() {
     if (selectedFurniture) editor.rotateFurniture(selectedFurniture.id);
   }, [selectedFurniture, editor]);
 
+  const handleMirrorSelected = useCallback(() => {
+    if (selectedFurniture) editor.mirrorFurniture(selectedFurniture.id);
+  }, [selectedFurniture, editor]);
+
   const handleDeleteSelected = useCallback(() => {
     if (selectedWall) editor.removeWall(selectedWall.id);
     if (selectedFurniture) editor.removeFurniture(selectedFurniture.id);
@@ -612,6 +616,7 @@ export default function Editor() {
                       selectedTextBox={selectedTextBox}
                       selectedArrow={selectedArrow}
                       onRotate={handleRotateSelected}
+                      onMirror={handleMirrorSelected}
                       onDelete={handleDeleteSelected}
                       onDuplicate={handleDuplicate}
                       onUpdateFurniture={handleUpdateFurniture}
@@ -674,6 +679,7 @@ export default function Editor() {
                 selectedTextBox={selectedTextBox}
                 selectedArrow={selectedArrow}
                 onRotate={handleRotateSelected}
+                onMirror={handleMirrorSelected}
                 onDelete={handleDeleteSelected}
                 onDuplicate={handleDuplicate}
                 onUpdateFurniture={handleUpdateFurniture}

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { EditorState, Wall, FurnitureItem, RoomLabel, TextBox, Arrow, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX, DEFAULT_ARROW } from "../lib/types";
+import { EditorState, Wall, FurnitureItem, RoomLabel, TextBox, Arrow, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX, DEFAULT_ARROW, FURNITURE_LIBRARY } from "../lib/types";
 
 function generateId(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -118,10 +118,28 @@ export function useEditor() {
     pushUndo();
     setState((s) => ({
       ...s,
+      furniture: s.furniture.map((f) => {
+        if (f.id !== id) return f;
+        const template = FURNITURE_LIBRARY.find((t) => t.type === f.type);
+        const snap = template?.rotationSnap ?? 90;
+        const newRotation = (f.rotation + snap) % 360;
+        // Only swap width/height for 90° increments
+        const swapDims = snap === 90;
+        return {
+          ...f,
+          rotation: newRotation,
+          ...(swapDims ? { width: f.height, height: f.width } : {}),
+        };
+      }),
+    }));
+  }, [pushUndo]);
+
+  const mirrorFurniture = useCallback((id: string) => {
+    pushUndo();
+    setState((s) => ({
+      ...s,
       furniture: s.furniture.map((f) =>
-        f.id === id
-          ? { ...f, rotation: (f.rotation + 90) % 360, width: f.height, height: f.width }
-          : f
+        f.id === id ? { ...f, mirrored: !f.mirrored } : f
       ),
     }));
   }, [pushUndo]);
@@ -354,6 +372,7 @@ export function useEditor() {
     addFurniture,
     moveFurniture,
     rotateFurniture,
+    mirrorFurniture,
     removeFurniture,
     addLabel,
     moveLabel,
