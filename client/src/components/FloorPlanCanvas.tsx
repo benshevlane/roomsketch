@@ -315,7 +315,7 @@ export default function FloorPlanCanvas({
     }
 
     // Furniture — draw floor items first, then wall cupboards on top, then doors/windows
-    const floorFurniture = state.furniture.filter((f) => f.type !== "door" && f.type !== "window" && !isWallCupboard(f.type));
+    const floorFurniture = state.furniture.filter((f) => f.type !== "door" && f.type !== "door_double" && f.type !== "window" && f.type !== "bay_window" && !isWallCupboard(f.type));
     drawFurniture(ctx, floorFurniture, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
     // Wall cupboards render above floor units
@@ -323,7 +323,7 @@ export default function FloorPlanCanvas({
     drawFurniture(ctx, wallCupboards, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
     // Doors & windows render on top of walls so they overlay correctly
-    const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
+    const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window" || f.type === "bay_window");
     drawFurniture(ctx, doorWindowItems, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
     // Wall snap indicator lines (during drag)

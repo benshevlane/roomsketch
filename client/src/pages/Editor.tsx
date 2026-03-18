@@ -216,13 +216,24 @@ export default function Editor() {
   }, [selectedFurniture, selectedLabel, selectedTextBox, selectedArrow, editor]);
 
   const handleAddTextBox = useCallback(() => {
+    const canvasEl = document.querySelector('[data-testid="floor-plan-canvas"]');
+    const cx = canvasEl ? canvasEl.clientWidth / 2 : 400;
+    const cy = canvasEl ? canvasEl.clientHeight / 2 : 300;
     const centerWorld = {
-      x: (400 - state.panOffset.x) / ((state.gridSize * state.zoom) / 100),
-      y: (300 - state.panOffset.y) / ((state.gridSize * state.zoom) / 100),
+      x: (cx - state.panOffset.x) / ((state.gridSize * state.zoom) / 100),
+      y: (cy - state.panOffset.y) / ((state.gridSize * state.zoom) / 100),
     };
     editor.addTextBox(centerWorld);
     editor.setTool("select");
   }, [editor, state]);
+
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedWall) editor.removeWall(selectedWall.id);
+    if (selectedFurniture) editor.removeFurniture(selectedFurniture.id);
+    if (selectedLabel) editor.removeLabel(selectedLabel.id);
+    if (selectedTextBox) editor.removeTextBox(selectedTextBox.id);
+    if (selectedArrow) editor.removeArrow(selectedArrow.id);
+  }, [selectedWall, selectedFurniture, selectedLabel, selectedTextBox, selectedArrow, editor]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -276,10 +287,24 @@ export default function Editor() {
         e.preventDefault();
         handleDuplicate();
       }
+
+      // Escape: cancel wall drawing, or deselect
+      if (e.key === "Escape") {
+        if (state.wallDrawing) {
+          editor.setWallDrawing(null);
+        } else if (state.selectedItemId) {
+          editor.setSelectedItem(null);
+        }
+      }
+
+      // Delete/Backspace: delete selected item
+      if (e.key === "Delete" || e.key === "Backspace") {
+        handleDeleteSelected();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [editor, handleCopy, handlePaste, handleDuplicate, handleAddTextBox]);
+  }, [editor, handleCopy, handlePaste, handleDuplicate, handleAddTextBox, handleDeleteSelected, state.wallDrawing, state.selectedItemId]);
 
   const handleRotateSelected = useCallback(() => {
     if (selectedFurniture) editor.rotateFurniture(selectedFurniture.id);
@@ -288,14 +313,6 @@ export default function Editor() {
   const handleMirrorSelected = useCallback(() => {
     if (selectedFurniture) editor.mirrorFurniture(selectedFurniture.id);
   }, [selectedFurniture, editor]);
-
-  const handleDeleteSelected = useCallback(() => {
-    if (selectedWall) editor.removeWall(selectedWall.id);
-    if (selectedFurniture) editor.removeFurniture(selectedFurniture.id);
-    if (selectedLabel) editor.removeLabel(selectedLabel.id);
-    if (selectedTextBox) editor.removeTextBox(selectedTextBox.id);
-    if (selectedArrow) editor.removeArrow(selectedArrow.id);
-  }, [selectedWall, selectedFurniture, selectedLabel, selectedTextBox, selectedArrow, editor]);
 
   const handleSavePlan = useCallback(async () => {
     try {
@@ -420,9 +437,12 @@ export default function Editor() {
   const handleSelectFurniture = useCallback(
     (template: FurnitureTemplate) => {
       // Place at center of visible area
+      const canvasEl = document.querySelector('[data-testid="floor-plan-canvas"]');
+      const cx = canvasEl ? canvasEl.clientWidth / 2 : 400;
+      const cy = canvasEl ? canvasEl.clientHeight / 2 : 300;
       const centerWorld = {
-        x: (400 - state.panOffset.x) / ((state.gridSize * state.zoom) / 100),
-        y: (300 - state.panOffset.y) / ((state.gridSize * state.zoom) / 100),
+        x: (cx - state.panOffset.x) / ((state.gridSize * state.zoom) / 100),
+        y: (cy - state.panOffset.y) / ((state.gridSize * state.zoom) / 100),
       };
       editor.addFurniture(template, centerWorld);
       editor.setTool("select");
@@ -739,7 +759,7 @@ export default function Editor() {
           <DialogHeader>
             <DialogTitle>Clear canvas?</DialogTitle>
             <DialogDescription>
-              This will remove all walls, furniture, and labels. This action cannot be undone.
+              This will remove all walls, furniture, and labels. You can undo this with Ctrl+Z.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">

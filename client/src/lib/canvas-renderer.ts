@@ -528,7 +528,8 @@ export function drawWalls(
 
   // Draw merged labels for collinear groups (skip if group has door/window occupants)
   for (const group of collinearGroups.values()) {
-    const thickness = walls[0]?.thickness ?? 15;
+    const representativeWallForThickness = walls.find((w) => group.wallIds.has(w.id));
+    const thickness = representativeWallForThickness?.thickness ?? 15;
 
     const sx = group.minP.x * pxPerCm + panOffset.x;
     const sy = group.minP.y * pxPerCm + panOffset.y;
@@ -654,9 +655,6 @@ export function drawWallSegmentMeasurements(
   const color = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
   const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
   if (doorsWindows.length === 0) return;
-
-  // Wall inside measurements are always shown via drawWalls(); no segment breakdown needed.
-  return;
 
   // Find collinear wall groups so we measure segments against the full merged wall
   const collinearGroups = findCollinearGroups(walls);
