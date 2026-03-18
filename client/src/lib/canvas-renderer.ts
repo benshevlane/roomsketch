@@ -64,6 +64,15 @@ const SIMPLE_COMPONENT_TYPES = new Set([
   "wardrobe",
 ]);
 
+/** Component types whose labels should render inside the component rectangle */
+const LABEL_INSIDE_TYPES = new Set([
+  "worktop", "island", "fridge", "dishwasher",
+  "tumble_dryer", "washing_machine", "kitchen_sink_d",
+  "bed_king", "bed_superking",
+  "sofa_3", "sofa_2", "sofa_l",
+  "dining_table_4", "dining_table_6",
+]);
+
 /** Ray-casting point-in-polygon test (works for convex and concave polygons) */
 function pointInPolygon(p: Point, vertices: Point[]): boolean {
   let inside = false;
@@ -3703,22 +3712,30 @@ export function collectComponentLabelRects(
     const pillW = maxWidth + 10;
     const pillH = nameFontSize + dimFontSize + 8;
 
-    // Check if label fits inside a simple component
-    const isInside = SIMPLE_COMPONENT_TYPES.has(item.type)
+    // Check if label fits inside the component
+    const isLabelInsideType = item.labelInside ?? LABEL_INSIDE_TYPES.has(item.type);
+    const isInside = isLabelInsideType
       && !isWallCupboard(item.type)
       && pillW < itemWidthPx * 0.95
       && pillH < itemHeightPx * 0.85;
+
+    // Apply labelOffset (stored in cm, convert to px)
+    const offsetPx = item.labelOffset
+      ? { x: item.labelOffset.x * pxPerCm, y: item.labelOffset.y * pxPerCm }
+      : { x: 0, y: 0 };
 
     if (outsideNormal) {
       // Offset label to the exterior side of the room
       const extent = Math.max(itemWidthPx, itemHeightPx) / 2;
       const offsetDist = extent + 14 * zoom;
-      labelX = centerX + outsideNormal.nx * offsetDist;
-      labelY = centerY + outsideNormal.ny * offsetDist;
+      labelX = centerX + outsideNormal.nx * offsetDist + offsetPx.x;
+      labelY = centerY + outsideNormal.ny * offsetDist + offsetPx.y;
     } else if (isInside) {
-      labelY = centerY;
+      labelX = centerX + offsetPx.x;
+      labelY = centerY + offsetPx.y;
     } else {
-      labelY = centerY + itemHeightPx / 2 + 14 * zoom;
+      labelX = centerX + offsetPx.x;
+      labelY = centerY + itemHeightPx / 2 + 14 * zoom + offsetPx.y;
     }
 
     const nameColor = isSelected
@@ -3743,9 +3760,18 @@ function drawInsideComponentLabel(
   isDark: boolean
 ) {
   const item = info.item;
+  // Hide label when item is too small on screen
+  const renderedWidth = item.width * pxPerCm;
+  if (renderedWidth < 60) return;
+
   const cx = (item.x + item.width / 2) * pxPerCm + panOffset.x;
   const cy = (item.y + item.height / 2) * pxPerCm + panOffset.y;
   const rotation = (item.rotation * Math.PI) / 180;
+
+  // Apply labelOffset in local (rotated) space
+  const offsetPx = item.labelOffset
+    ? { x: item.labelOffset.x * pxPerCm, y: item.labelOffset.y * pxPerCm }
+    : { x: 0, y: 0 };
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -3753,21 +3779,44 @@ function drawInsideComponentLabel(
   if (item.mirrored) ctx.scale(-1, 1); // counter-mirror so text reads normally
 
   const totalTextH = info.nameFontSize + info.dimFontSize + 2;
-  const nameY = -totalTextH / 2;
+  const nameY = -totalTextH / 2 + offsetPx.y;
+  const labelX = offsetPx.x;
 
   // Name
   ctx.font = `${info.isSelected ? "600" : "500"} ${info.nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
   ctx.fillStyle = info.nameColor;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillText(info.displayName, 0, nameY);
+  ctx.fillText(info.displayName, labelX, nameY);
 
   // Dimensions
   ctx.font = `400 ${info.dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
   ctx.fillStyle = isDark ? "rgba(121, 120, 118, 0.8)" : "rgba(122, 121, 116, 0.7)";
-  ctx.fillText(info.dimText, 0, nameY + info.nameFontSize + 2);
+  ctx.fillText(info.dimText, labelX, nameY + info.nameFontSize + 2);
 
   ctx.restore();
+}
+
+/** Hit-test a screen point against component labels. Returns the FurnitureItem if hit, null otherwise. */
+export function hitTestComponentLabel(
+  screenX: number,
+  screenY: number,
+  componentLabelInfos: ComponentLabelInfo[]
+): FurnitureItem | null {
+  for (let i = componentLabelInfos.length - 1; i >= 0; i--) {
+    const info = componentLabelInfos[i];
+    const lx = info.centerX;
+    const ly = info.labelY;
+    const halfW = info.pillW / 2 + 4;
+    const halfH = info.pillH / 2 + 4;
+    if (
+      screenX >= lx - halfW && screenX <= lx + halfW &&
+      screenY >= ly - halfH && screenY <= ly + halfH
+    ) {
+      return info.item;
+    }
+  }
+  return null;
 }
 
 /** Draw a single component label at a given position */
