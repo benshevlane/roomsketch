@@ -44,6 +44,7 @@ import {
   drawArrowPreview,
   hitTestArrow,
   hitTestArrowEndpoint,
+  hitTestComponentLabel,
 } from "../lib/canvas-renderer";
 import { isWallCupboard } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
@@ -124,6 +125,7 @@ export default function FloorPlanCanvas({
   const [isRotating, setIsRotating] = useState(false);
   const [rotateStartAngle, setRotateStartAngle] = useState(0);
   const [rotateItemStartRot, setRotateItemStartRot] = useState(0);
+  const [draggingComponentLabel, setDraggingComponentLabel] = useState<{ id: string; startX: number; startY: number; origOffsetX: number; origOffsetY: number } | null>(null);
 
   // Wall snap indicator state (transient, only during drag)
   const [wallSnapEdges, setWallSnapEdges] = useState<SnappedWallEdge[]>([]);
@@ -458,6 +460,12 @@ export default function FloorPlanCanvas({
       const pos = getCanvasPos(e);
       setMousePos(pos);
 
+      // If editing a label, commit and close on any canvas click
+      if (editingLabel.id !== null || editingLabel.isNew || editingLabel.isRoomLabel) {
+        labelInputRef.current?.blur();
+        return;
+      }
+
       // Track pointer for pinch-to-zoom
       pointerCache.current.set(e.pointerId, e.nativeEvent);
       if (pointerCache.current.size === 2) {
@@ -552,6 +560,23 @@ export default function FloorPlanCanvas({
             y: pos.y - (hitLbl.y * pxPerCm + state.panOffset.y),
           });
           return;
+        }
+
+        // Check component label drag
+        if (state.componentLabelsVisible) {
+          const hitCompLabel = hitTestComponentLabel(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset, ctx);
+          if (hitCompLabel) {
+            onSelectItem(hitCompLabel.id);
+            setDraggingComponentLabel({
+              id: hitCompLabel.id,
+              startX: pos.x,
+              startY: pos.y,
+              origOffsetX: hitCompLabel.labelOffsetX || 0,
+              origOffsetY: hitCompLabel.labelOffsetY || 0,
+            });
+            onPushUndo();
+            return;
+          }
         }
 
         // Check arrow endpoint drag handles first for selected arrow
@@ -664,7 +689,7 @@ export default function FloorPlanCanvas({
         setTimeout(() => labelInputRef.current?.focus(), 0);
       }
     },
-    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onRemoveArrow, onPushUndo, onUpdateFurniture, onSplitWallAndConnect, onAddArrow, arrowDrawingStart]
+    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onRemoveArrow, onPushUndo, onUpdateFurniture, onSplitWallAndConnect, onAddArrow, arrowDrawingStart, editingLabel]
   );
 
   // Store world position for new labels
@@ -840,6 +865,16 @@ export default function FloorPlanCanvas({
         return;
       }
 
+      if (draggingComponentLabel) {
+        const dx = (pos.x - draggingComponentLabel.startX) / state.zoom;
+        const dy = (pos.y - draggingComponentLabel.startY) / state.zoom;
+        onUpdateFurniture(draggingComponentLabel.id, {
+          labelOffsetX: draggingComponentLabel.origOffsetX + dx,
+          labelOffsetY: draggingComponentLabel.origOffsetY + dy,
+        });
+        return;
+      }
+
       if (isDragging && state.selectedItemId) {
         const pxPerCm = (state.gridSize * state.zoom) / 100;
         const worldX = (pos.x - dragItemOffset.x - state.panOffset.x) / pxPerCm;
@@ -915,7 +950,7 @@ export default function FloorPlanCanvas({
         setEraserHoverId(null);
       }
     },
-    [state, isPanning, isDragging, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow]
+    [state, isPanning, isDragging, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, arrowDraggingEndpoint, draggingComponentLabel, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveLabel, onUpdateFurniture, onUpdateArrow]
   );
 
   const handlePointerUp = useCallback(
@@ -982,6 +1017,7 @@ export default function FloorPlanCanvas({
       setResizeCorner(null);
       setResizeStart(null);
       setArrowDraggingEndpoint(null);
+      setDraggingComponentLabel(null);
     },
     [isDragging, onPushUndo, state.selectedTool, state.gridSize, state.zoom, state.panOffset, state.walls, getCanvasPos, onAddWall, onSetWallDrawing, onSplitWallAndConnect]
   );
@@ -1063,13 +1099,14 @@ export default function FloorPlanCanvas({
           return;
         }
 
-        // Check component labels (double-click to rename)
+        // Check component labels (double-click to rename) — check label area first, then furniture body
         if (state.componentLabelsVisible) {
-          const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
+          const hitCompLabel = hitTestComponentLabel(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset, ctx);
+          const hitFurn = hitCompLabel || hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
           if (hitFurn) {
             const pxPerCm = (state.gridSize * state.zoom) / 100;
-            const centerX = (hitFurn.x + hitFurn.width / 2) * pxPerCm + state.panOffset.x;
-            const labelY = (hitFurn.y + hitFurn.height) * pxPerCm + state.panOffset.y + 14 * state.zoom;
+            const centerX = (hitFurn.x + hitFurn.width / 2) * pxPerCm + state.panOffset.x + (hitFurn.labelOffsetX || 0) * state.zoom;
+            const labelY = (hitFurn.y + hitFurn.height) * pxPerCm + state.panOffset.y + 14 * state.zoom + (hitFurn.labelOffsetY || 0) * state.zoom;
             const displayName = hitFurn.customName || hitFurn.label;
             setEditingLabel({ id: hitFurn.id, x: centerX, y: labelY, text: displayName, isNew: false });
             editingLabelWorldPos.current = { x: hitFurn.x + hitFurn.width / 2, y: hitFurn.y + hitFurn.height };

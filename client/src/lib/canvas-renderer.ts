@@ -2033,13 +2033,14 @@ export function drawComponentLabels(
   const pxPerCm = (gridSize * zoom) / 100;
 
   furniture.forEach((item) => {
-    const centerX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
+    const baseCenterX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
     const centerY = (item.y + item.height / 2) * pxPerCm + panOffset.y;
     const h = item.height * pxPerCm;
     const isSelected = item.id === selectedId;
+    const centerX = baseCenterX + (item.labelOffsetX || 0) * zoom;
 
     // Position label below the item
-    const labelY = centerY + h / 2 + 14 * zoom;
+    const labelY = centerY + h / 2 + 14 * zoom + (item.labelOffsetY || 0) * zoom;
 
     const displayName = item.customName || item.label;
     const dimText = `${item.width} \u00D7 ${item.height} cm`;
@@ -2752,6 +2753,55 @@ export function hitTestLabel(
       screenY <= y + h / 2
     ) {
       return label;
+    }
+  }
+  return null;
+}
+
+/** Hit test component labels (furniture name labels rendered below/inside items) */
+export function hitTestComponentLabel(
+  screenX: number,
+  screenY: number,
+  furniture: FurnitureItem[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  ctx: CanvasRenderingContext2D
+): FurnitureItem | null {
+  const pxPerCm = (gridSize * zoom) / 100;
+
+  for (const item of furniture) {
+    const baseCenterX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
+    const centerY = (item.y + item.height / 2) * pxPerCm + panOffset.y;
+    const itemHeightPx = item.height * pxPerCm;
+    const centerX = baseCenterX + (item.labelOffsetX || 0) * zoom;
+
+    const displayName = item.customName || item.label;
+    const dimText = `${item.width} \u00D7 ${item.height} cm`;
+
+    const nameFontSize = Math.max(9, 11 * zoom);
+    const dimFontSize = Math.max(8, 9 * zoom);
+
+    ctx.font = `500 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const nameWidth = ctx.measureText(displayName).width;
+    ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const dimWidth = ctx.measureText(dimText).width;
+    const maxWidth = Math.max(nameWidth, dimWidth);
+    const pillW = maxWidth + 10;
+    const pillH = nameFontSize + dimFontSize + 8;
+
+    const labelY = centerY + itemHeightPx / 2 + 14 * zoom + (item.labelOffsetY || 0) * zoom;
+
+    const pillX = centerX - pillW / 2;
+    const pillY = labelY - 2;
+
+    if (
+      screenX >= pillX &&
+      screenX <= pillX + pillW &&
+      screenY >= pillY &&
+      screenY <= pillY + pillH
+    ) {
+      return item;
     }
   }
   return null;
@@ -3592,11 +3642,12 @@ export function collectComponentLabelRects(
   const results: ComponentLabelInfo[] = [];
 
   for (const item of furniture) {
-    const centerX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
+    const baseCenterX = (item.x + item.width / 2) * pxPerCm + panOffset.x;
     const centerY = (item.y + item.height / 2) * pxPerCm + panOffset.y;
     const itemWidthPx = item.width * pxPerCm;
     const itemHeightPx = item.height * pxPerCm;
     const isSelected = item.id === selectedId;
+    const centerX = baseCenterX + (item.labelOffsetX || 0) * zoom;
 
     const displayName = item.customName || item.label;
     const dimText = `${item.width} \u00D7 ${item.height} cm`;
@@ -3619,8 +3670,8 @@ export function collectComponentLabelRects(
       && pillH < itemHeightPx * 0.85;
 
     const labelY = isInside
-      ? centerY
-      : centerY + itemHeightPx / 2 + 14 * zoom;
+      ? centerY + (item.labelOffsetY || 0) * zoom
+      : centerY + itemHeightPx / 2 + 14 * zoom + (item.labelOffsetY || 0) * zoom;
 
     const nameColor = isSelected
       ? (isDark ? "#4f98a3" : "#01696f")
@@ -3641,11 +3692,12 @@ function drawInsideComponentLabel(
   info: ComponentLabelInfo,
   pxPerCm: number,
   panOffset: Point,
-  isDark: boolean
+  isDark: boolean,
+  zoom: number = 1
 ) {
   const item = info.item;
-  const cx = (item.x + item.width / 2) * pxPerCm + panOffset.x;
-  const cy = (item.y + item.height / 2) * pxPerCm + panOffset.y;
+  const cx = (item.x + item.width / 2) * pxPerCm + panOffset.x + (item.labelOffsetX || 0) * zoom;
+  const cy = (item.y + item.height / 2) * pxPerCm + panOffset.y + (item.labelOffsetY || 0) * zoom;
   const rotation = (item.rotation * Math.PI) / 180;
 
   ctx.save();
@@ -3912,7 +3964,7 @@ export function resolveAndDrawLabelCollisions(
     // Draw inside-component labels (not collision-resolved, anchored inside)
     for (const info of componentLabelInfos) {
       if (info.isInside) {
-        drawInsideComponentLabel(ctx, info, pxPerCm, panOffset, isDark);
+        drawInsideComponentLabel(ctx, info, pxPerCm, panOffset, isDark, zoom);
       }
     }
   }
