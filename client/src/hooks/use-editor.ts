@@ -247,7 +247,7 @@ export function useEditor() {
       y: position.y,
       fontSize: 16,
     };
-    setState((s) => ({ ...s, labels: [...s.labels, label] }));
+    setState((s) => ({ ...s, labels: [...s.labels, label], selectedItemId: label.id, selectedTool: "select" }));
   }, [pushUndo]);
 
   const moveLabel = useCallback((id: string, x: number, y: number) => {

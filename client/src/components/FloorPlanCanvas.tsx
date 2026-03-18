@@ -1343,10 +1343,13 @@ export default function FloorPlanCanvas({
         onSetRoomName(editingLabel.roomKey, text);
       }
       setSelectedRoomKey(null);
+      onSetTool("select");
     } else if (editingLabel.isNew) {
-      // New freeform label
+      // New freeform label — addLabel atomically selects the new label + switches to select
       if (text) {
         onAddLabel(text, editingLabelWorldPos.current);
+      } else {
+        onSetTool("select");
       }
     } else if (editingLabel.id) {
       // Check if this is a furniture rename
@@ -1361,9 +1364,11 @@ export default function FloorPlanCanvas({
           onUpdateLabel(editingLabel.id, { text });
         }
       }
+      onSetTool("select");
+    } else {
+      onSetTool("select");
     }
     setEditingLabel({ id: null, x: 0, y: 0, text: "", isNew: false });
-    onSetTool("select");
   }, [editingLabel, onAddLabel, onUpdateLabel, onSetRoomName, onUpdateFurniture, state.furniture, onSetTool]);
 
   const cancelLabel = useCallback(() => {
