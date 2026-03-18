@@ -894,9 +894,10 @@ export function drawWallSegmentMeasurements(
     // Sort occupants by position along wall
     occupants.sort((a, b) => a.along - b.along);
 
-    // Compute segments: wall start -> first door edge, between doors, last door edge -> wall end
-    // In inside mode, inset segment boundaries by half wall thickness at each wall end
-    // In full mode, extend at connected endpoints to match junction circle extent
+    // Compute segments: for each item, independently measure to both wall endpoints
+    // so that other items on the same wall don't interrupt the measurement lines.
+    // In inside mode, inset segment boundaries by half wall thickness at each wall end.
+    // In full mode, extend at connected endpoints to match junction circle extent.
     const halfThick = wallThick / 2;
     const { startExtension: segStartExt, endExtension: segEndExt } = measureMode === "full"
       ? getEndpointExtensions(wallStart, wallEnd, wallThick, walls)
@@ -904,17 +905,15 @@ export function drawWallSegmentMeasurements(
     const wallStartAlong = measureMode === "inside" ? halfThick : -segStartExt;
     const wallEndAlong = measureMode === "inside" ? wallLen - halfThick : wallLen + segEndExt;
     const segments: { startAlong: number; endAlong: number }[] = [];
-    let prevEnd = wallStartAlong;
     for (const occ of occupants) {
       const edgeStart = occ.along - occ.halfExtent;
       const edgeEnd = occ.along + occ.halfExtent;
-      if (edgeStart > prevEnd + 1) {
-        segments.push({ startAlong: prevEnd, endAlong: edgeStart });
+      if (edgeStart > wallStartAlong + 1) {
+        segments.push({ startAlong: wallStartAlong, endAlong: edgeStart });
       }
-      prevEnd = Math.max(prevEnd, edgeEnd);
-    }
-    if (wallEndAlong - prevEnd > 1) {
-      segments.push({ startAlong: prevEnd, endAlong: wallEndAlong });
+      if (wallEndAlong > edgeEnd + 1) {
+        segments.push({ startAlong: edgeEnd, endAlong: wallEndAlong });
+      }
     }
 
     // Draw each segment
