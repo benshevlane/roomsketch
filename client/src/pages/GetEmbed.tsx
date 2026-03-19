@@ -179,10 +179,19 @@ export default function GetEmbed() {
       setLogoError(null);
 
       try {
+        const b64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(",")[1]); // strip data:...;base64, prefix
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
         const res = await fetch("/api/upload-logo", {
           method: "POST",
-          headers: { "Content-Type": file.type },
-          body: file,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: b64, contentType: file.type, filename: file.name }),
         });
         const data = await res.json();
         if (!res.ok || !data.url) {
