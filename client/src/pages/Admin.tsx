@@ -43,8 +43,8 @@ export default function Admin() {
       } else {
         setMessage(data.error || "Upload failed");
       }
-    } catch {
-      setMessage("Upload failed — network error");
+    } catch (err) {
+      setMessage("Upload failed — " + (err instanceof Error ? err.message : "network error"));
     }
     setUploading(false);
   };
