@@ -17,7 +17,7 @@ export default function Admin() {
 
   useEffect(() => { checkHero(); }, [checkHero]);
 
-  const compressImage = (file: File, maxWidth = 1920, quality = 0.85): Promise<string> => {
+  const compressImage = (file: File, maxWidth = 1920, quality = 0.85): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
@@ -30,7 +30,11 @@ export default function Admin() {
         canvas.width = width;
         canvas.height = height;
         canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
+        canvas.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error("Compression failed")),
+          "image/jpeg",
+          quality,
+        );
       };
       img.onerror = () => reject(new Error("Failed to load image"));
       img.src = URL.createObjectURL(file);
@@ -45,20 +49,13 @@ export default function Admin() {
     setUploading(true);
     setMessage("");
     try {
-      const dataUrl = await compressImage(file);
-      const url = new URL("/api/admin/hero-image", window.location.origin).href;
-      const data: { ok?: boolean; size?: number; error?: string } = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", url);
-        // Use text/plain to avoid CORS preflight
-        xhr.setRequestHeader("Content-Type", "text/plain");
-        xhr.onload = () => {
-          try { resolve(JSON.parse(xhr.responseText)); }
-          catch { reject(new Error("Server returned (status " + xhr.status + "): " + xhr.responseText.slice(0, 200))); }
-        };
-        xhr.onerror = () => reject(new Error("Network error"));
-        xhr.send(dataUrl);
+      const blob = await compressImage(file);
+      const res = await fetch("/api/admin/hero-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: blob,
       });
+      const data = await res.json();
       if (data.ok) {
         setMessage(`Uploaded (${((data.size ?? 0) / 1024).toFixed(0)} KB)`);
         checkHero();

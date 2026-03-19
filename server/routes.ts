@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import path from "path";
@@ -58,20 +58,17 @@ export async function registerRoutes(
   });
 
   // Admin: upload hero image
-  app.post("/api/admin/hero-image", (req, res) => {
-    try {
-      const body: string = typeof req.body === "string" ? req.body : "";
-      if (!body || body.length < 10) {
+  app.post("/api/admin/hero-image",
+    express.raw({ type: "application/octet-stream", limit: "20mb" }),
+    (req, res) => {
+      const buf = req.body;
+      if (!Buffer.isBuffer(buf) || buf.length === 0) {
         return res.status(400).json({ error: "Missing image data" });
       }
-      const base64 = body.includes(",") ? body.split(",")[1] : body;
-      const buf = Buffer.from(base64, "base64");
       writeHeroImage(buf);
       return res.json({ ok: true, size: buf.length });
-    } catch {
-      return res.status(400).json({ error: "Invalid image data" });
-    }
-  });
+    },
+  );
 
   // Admin: check if hero image exists
   app.get("/api/admin/hero-image", (_req, res) => {
