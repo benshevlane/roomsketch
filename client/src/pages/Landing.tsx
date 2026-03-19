@@ -297,6 +297,20 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* For businesses */}
+      <section className={`${isDark ? "bg-[#1a1a18]" : "bg-[#faf8f4]"} py-20`}>
+        <div className="rs-fade opacity-0 translate-y-4 transition-all duration-700 max-w-2xl mx-auto px-5 text-center">
+          <h2 className={`text-2xl sm:text-3xl font-bold tracking-tight mb-3 ${isDark ? "text-[#f0ede6]" : "text-[#1a1a18]"}`}>Add Free Room Planner to your website</h2>
+          <p className={`mb-8 ${isDark ? "text-[#a09a8c]" : "text-[#6b6457]"}`}>Embed a branded room planner on your site — free. Let your customers visualize their space before they buy.</p>
+          <button
+            onClick={() => navigate("/get-embed")}
+            className={`px-8 py-3.5 rounded-xl text-base font-semibold transition-colors shadow-md ${isDark ? "bg-[#2e2e2a] hover:bg-[#3a3a36] text-[#f0ede6]" : "bg-[#1a1a18] hover:bg-[#2e2e2a] text-white"}`}
+          >
+            Get your embed code
+          </button>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className={`${isDark ? "bg-[#222220]" : "bg-[#1a1a18]"} py-16`}>
         <div className="rs-fade opacity-0 translate-y-4 transition-all duration-700 max-w-xl mx-auto px-5 text-center">
@@ -318,6 +332,7 @@ export default function Landing() {
             <FreeRoomPlannerLogo size={16} className={isDark ? "text-[#5a5a52]" : "text-[#9a9488]"} />
             <span>Free Room Planner</span>
           </div>
+          <a href="/get-embed" onClick={(e) => { e.preventDefault(); navigate("/get-embed"); }} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>For businesses</a>
           <span>© {new Date().getFullYear()} Free Room Planner. Free to use.</span>
         </div>
       </footer>
