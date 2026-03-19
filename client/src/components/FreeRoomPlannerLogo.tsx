@@ -6,7 +6,7 @@ interface LogoProps {
 export default function FreeRoomPlannerLogo({ className = "", size = 28 }: LogoProps) {
   return (
     <img
-      src="/logo.jpg"
+      src="/logo.png"
       alt="Free Room Planner"
       width={size}
       height={size}
