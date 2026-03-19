@@ -4,7 +4,9 @@
   "framework": null,
   "rewrites": [
     { "source": "/app", "destination": "/index.html" },
-    { "source": "/app/(.*)", "destination": "/index.html" }
+    { "source": "/app/(.*)", "destination": "/index.html" },
+    { "source": "/admin", "destination": "/index.html" },
+    { "source": "/get-embed", "destination": "/index.html" }
   ],
   "routes": [
     { "src": "/assets/(.*)", "dest": "/assets/$1" },

@@ -1,19 +1,53 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+
+const BUCKET = "hero-images";
+const OBJECT_PATH = "hero-floorplan.jpg";
 
 export default function Admin() {
   const [heroExists, setHeroExists] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error">("success");
   const fileRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  const checkHero = useCallback(async () => {
-    const res = await fetch("/api/admin/hero-image");
-    const data = await res.json();
-    setHeroExists(data.exists);
-    if (data.exists && data.url) setPreview(data.url);
+  const getPublicUrl = useCallback((): string | null => {
+    if (!supabase) return null;
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(OBJECT_PATH);
+    return data.publicUrl;
   }, []);
+
+  const checkHero = useCallback(async () => {
+    if (!supabase) {
+      setMessage("Supabase is not configured. Check environment variables.");
+      setMessageType("error");
+      return;
+    }
+    try {
+      const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .list("", { search: OBJECT_PATH });
+      if (error) {
+        console.error("Error checking hero image:", error);
+        setHeroExists(false);
+        return;
+      }
+      const exists = !!data && data.some((f) => f.name === OBJECT_PATH);
+      setHeroExists(exists);
+      if (exists) {
+        const url = getPublicUrl();
+        // Add cache-buster so the preview always shows the latest version
+        setPreview(url ? `${url}?t=${Date.now()}` : null);
+      } else {
+        setPreview(null);
+      }
+    } catch (err) {
+      console.error("Error checking hero image:", err);
+      setHeroExists(false);
+    }
+  }, [getPublicUrl]);
 
   useEffect(() => { checkHero(); }, [checkHero]);
 
@@ -44,26 +78,35 @@ export default function Admin() {
   const upload = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       setMessage("Please select an image file.");
+      setMessageType("error");
+      return;
+    }
+    if (!supabase) {
+      setMessage("Supabase is not configured. Check environment variables.");
+      setMessageType("error");
       return;
     }
     setUploading(true);
     setMessage("");
     try {
       const blob = await compressImage(file);
-      const res = await fetch("/api/admin/hero-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/octet-stream" },
-        body: blob,
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setMessage(`Uploaded (${((data.size ?? 0) / 1024).toFixed(0)} KB)`);
-        checkHero();
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(OBJECT_PATH, blob, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+      if (error) {
+        setMessage("Upload failed — " + error.message);
+        setMessageType("error");
       } else {
-        setMessage(data.error || "Upload failed");
+        setMessage(`Uploaded successfully (${(blob.size / 1024).toFixed(0)} KB)`);
+        setMessageType("success");
+        await checkHero();
       }
     } catch (err) {
-      setMessage("Upload failed — " + (err instanceof Error ? err.message : "network error"));
+      setMessage("Upload failed — " + (err instanceof Error ? err.message : "unknown error"));
+      setMessageType("error");
     }
     setUploading(false);
   };
@@ -72,13 +115,21 @@ export default function Admin() {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (file) upload(file);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onDelete = async () => {
-    await fetch("/api/admin/hero-image", { method: "DELETE" });
+    if (!supabase) return;
+    const { error } = await supabase.storage.from(BUCKET).remove([OBJECT_PATH]);
+    if (error) {
+      setMessage("Delete failed — " + error.message);
+      setMessageType("error");
+      return;
+    }
     setPreview(null);
     setHeroExists(false);
-    setMessage("Hero image removed. The homepage will show the default SVG.");
+    setMessage("Hero image removed. The homepage will show the default illustration.");
+    setMessageType("success");
   };
 
   return (
@@ -105,11 +156,11 @@ export default function Admin() {
           />
           <div className="text-4xl mb-3 text-[#c4bfb4]">{uploading ? "..." : "+"}</div>
           <p className="font-medium">{uploading ? "Uploading..." : "Drop an image here or click to browse"}</p>
-          <p className="text-sm text-[#9a9488] mt-1">PNG, JPG, or WebP. Will be saved as the homepage hero image.</p>
+          <p className="text-sm text-[#9a9488] mt-1">PNG, JPG, or WebP. Will be compressed and saved as the homepage hero image.</p>
         </div>
 
         {message && (
-          <p className="mt-4 text-sm font-medium text-[#3d8a7c]">{message}</p>
+          <p className={`mt-4 text-sm font-medium ${messageType === "error" ? "text-red-600" : "text-[#3d8a7c]"}`}>{message}</p>
         )}
 
         {/* Current hero preview */}

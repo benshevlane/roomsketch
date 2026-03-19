@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import FreeRoomPlannerLogo from "@/components/FreeRoomPlannerLogo";
 import { useDocumentMeta } from "@/hooks/use-document-meta";
+import { supabase } from "@/lib/supabase";
+
+const HERO_BUCKET = "hero-images";
+const HERO_PATH = "hero-floorplan.jpg";
 
 const features = [
   {
@@ -81,6 +85,7 @@ export default function Landing() {
   const [, navigate] = useLocation();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [isDark, setIsDark] = useState(false);
+  const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     setIsDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -89,6 +94,26 @@ export default function Landing() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
+
+  // Check if a custom hero image exists in Supabase Storage
+  useEffect(() => {
+    if (!supabase) return;
+    (async () => {
+      try {
+        const { data } = await supabase.storage
+          .from(HERO_BUCKET)
+          .list("", { search: HERO_PATH });
+        if (data && data.some((f) => f.name === HERO_PATH)) {
+          const { data: urlData } = supabase.storage
+            .from(HERO_BUCKET)
+            .getPublicUrl(HERO_PATH);
+          setHeroImageUrl(urlData.publicUrl);
+        }
+      } catch {
+        // Silently fall back to SVG illustration
+      }
+    })();
+  }, []);
 
   // Fade-in on scroll
   useEffect(() => {
@@ -188,7 +213,14 @@ export default function Landing() {
               <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]"/>
               <span className={`ml-3 text-xs ${isDark ? "text-[#5a5a52]" : "text-[#9a9488]"}`}>freeroomplanner.com/app</span>
             </div>
-            {/* Floor plan illustration — L-shaped kitchen */}
+            {/* Show uploaded hero image if available, otherwise fallback to SVG */}
+            {heroImageUrl ? (
+              <img
+                src={heroImageUrl}
+                alt="Floor plan created with Free Room Planner"
+                className="w-full"
+              />
+            ) : (
             <svg viewBox="0 0 700 580" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full" role="img" aria-label="L-shaped kitchen floor plan with furniture layout, dimensions, and room labels created with Free Room Planner">
               {/* Background */}
               <rect width="700" height="580" fill={isDark ? "#222220" : "#ffffff"} />
@@ -343,6 +375,7 @@ export default function Landing() {
               <line x1="576" y1="160" x2="588" y2="160" stroke={isDark ? "#5ba89a" : "#3d8a7c"} strokeWidth="1" />
               <text x="594" y="110" textAnchor="middle" fill={isDark ? "#5ba89a" : "#3d8a7c"} fontSize="10" fontFamily="sans-serif" fontWeight="600" transform="rotate(-90 594 110)">13&apos;1&quot;</text>
             </svg>
+            )}
           </div>
         </div>
       </section>
