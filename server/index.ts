@@ -24,7 +24,6 @@ app.use(
   }),
 );
 
-app.use(express.text({ type: "text/plain", limit: "20mb" }));
 app.use(express.urlencoded({ extended: false }));
 
 // Frame-embedding headers: allow iframes only on /embed
