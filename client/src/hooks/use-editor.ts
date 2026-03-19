@@ -1,11 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { EditorState, Wall, FurnitureItem, RoomLabel, TextBox, Arrow, Point, EditorTool, FurnitureTemplate, UnitSystem, DEFAULT_TEXT_BOX, DEFAULT_ARROW, FURNITURE_LIBRARY } from "../lib/types";
 
-const AUTOSAVE_KEY = "freeroomplanner-autosave";
+const DEFAULT_AUTOSAVE_KEY = "freeroomplanner-autosave";
 
-function loadSavedState(): Partial<EditorState> | null {
+function loadSavedState(storageKey: string): Partial<EditorState> | null {
   try {
-    const saved = localStorage.getItem(AUTOSAVE_KEY);
+    const saved = localStorage.getItem(storageKey);
     if (!saved) return null;
     const parsed = JSON.parse(saved);
     if (parsed && parsed.version === 1 && Array.isArray(parsed.walls)) {
@@ -17,7 +17,7 @@ function loadSavedState(): Partial<EditorState> | null {
   return null;
 }
 
-function saveStateToStorage(state: EditorState): void {
+function saveStateToStorage(state: EditorState, storageKey: string): void {
   try {
     const data = {
       version: 1,
@@ -31,7 +31,7 @@ function saveStateToStorage(state: EditorState): void {
       roomLabelOffsets: state.roomLabelOffsets,
       componentLabelsVisible: state.componentLabelsVisible,
     };
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+    localStorage.setItem(storageKey, JSON.stringify(data));
   } catch {
     // Ignore quota errors
   }
@@ -85,8 +85,8 @@ const DEFAULT_STATE: EditorState = {
   componentLabelsVisible: true,
 };
 
-function getInitialState(): EditorState {
-  const saved = loadSavedState();
+function getInitialState(storageKey: string): EditorState {
+  const saved = loadSavedState(storageKey);
   if (!saved) return DEFAULT_STATE;
   return {
     ...DEFAULT_STATE,
@@ -106,8 +106,8 @@ function getInitialState(): EditorState {
   };
 }
 
-export function useEditor() {
-  const [state, setState] = useState<EditorState>(getInitialState);
+export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
+  const [state, setState] = useState<EditorState>(() => getInitialState(storageKey));
   const undoStack = useRef<EditorState[]>([]);
   const redoStack = useRef<EditorState[]>([]);
 
@@ -140,8 +140,8 @@ export function useEditor() {
 
   // Auto-save plan data to localStorage whenever it changes
   useEffect(() => {
-    saveStateToStorage(state);
-  }, [state.walls, state.furniture, state.labels, state.textBoxes, state.arrows, state.roomName, state.roomNames, state.componentLabelsVisible]);
+    saveStateToStorage(state, storageKey);
+  }, [state.walls, state.furniture, state.labels, state.textBoxes, state.arrows, state.roomName, state.roomNames, state.componentLabelsVisible, storageKey]);
 
   const setTool = useCallback((tool: EditorTool) => {
     setState((s) => ({ ...s, selectedTool: tool, selectedItemId: null, wallDrawing: null, wallChainStart: null }));
@@ -297,7 +297,7 @@ export function useEditor() {
 
   const clearAll = useCallback(() => {
     pushUndo();
-    try { localStorage.removeItem(AUTOSAVE_KEY); } catch {}
+    try { localStorage.removeItem(storageKey); } catch {}
     setState((s) => ({
       ...s,
       walls: [],

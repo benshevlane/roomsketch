@@ -22,6 +22,26 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// Frame-embedding headers: allow iframes only on /embed
+app.use((req, _res, next) => {
+  const res = _res;
+  if (req.path === "/embed") {
+    // Allow embedding from any origin (v1)
+    res.setHeader(
+      "Content-Security-Policy",
+      "frame-ancestors *"
+    );
+    // Do NOT set X-Frame-Options so browsers allow framing
+  } else {
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader(
+      "Content-Security-Policy",
+      "frame-ancestors 'none'"
+    );
+  }
+  next();
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",

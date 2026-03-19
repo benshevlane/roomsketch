@@ -1,0 +1,70 @@
+import { UnitSystem } from "./types";
+
+export interface EmbedParams {
+  partner: string | null;
+  brandColor: string | null;
+  logoUrl: string | null;
+  dark: boolean | null;
+  units: UnitSystem;
+  hideToolbar: boolean;
+}
+
+export function parseEmbedParams(searchString: string): EmbedParams {
+  const params = new URLSearchParams(searchString);
+
+  // partner: alphanumeric, hyphens, underscores only, max 64 chars
+  let partner: string | null = null;
+  const rawPartner = params.get("partner");
+  if (rawPartner && /^[a-zA-Z0-9_-]{1,64}$/.test(rawPartner)) {
+    partner = rawPartner;
+  }
+
+  // brandColor: valid 3–8 char hex without #
+  let brandColor: string | null = null;
+  const rawColor = params.get("brand_color");
+  if (rawColor && /^[0-9a-fA-F]{3,8}$/.test(rawColor)) {
+    brandColor = rawColor;
+  }
+
+  // logoUrl: must be https:// only
+  let logoUrl: string | null = null;
+  const rawLogo = params.get("logo_url");
+  if (rawLogo) {
+    try {
+      const url = new URL(rawLogo);
+      if (url.protocol === "https:") {
+        logoUrl = rawLogo;
+      }
+    } catch {
+      // invalid URL, ignore
+    }
+  }
+
+  // dark: "1" = true, "0" = false, absent = null
+  let dark: boolean | null = null;
+  const rawDark = params.get("dark");
+  if (rawDark === "1") dark = true;
+  else if (rawDark === "0") dark = false;
+
+  // units: default "m"
+  let units: UnitSystem = "m";
+  const rawUnits = params.get("units");
+  if (rawUnits === "m" || rawUnits === "cm" || rawUnits === "mm" || rawUnits === "ft") {
+    units = rawUnits;
+  }
+
+  // hideToolbar: default false
+  const hideToolbar = params.get("hide_toolbar") === "1";
+
+  // Silently ignore any badge-hiding parameters
+  // (hide_badge, no_badge, disable_badge, etc. are never parsed)
+
+  return {
+    partner,
+    brandColor,
+    logoUrl,
+    dark,
+    units,
+    hideToolbar,
+  };
+}

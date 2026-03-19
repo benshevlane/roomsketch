@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Editor from "@/pages/Editor";
+import Embed from "@/pages/Embed";
 import Landing from "@/pages/Landing";
 
 function AppRouter() {
@@ -12,6 +13,7 @@ function AppRouter() {
     <Switch>
       <Route path="/" component={Landing} />
       <Route path="/app" component={Editor} />
+      <Route path="/embed" component={Embed} />
       <Route component={NotFound} />
     </Switch>
   );
