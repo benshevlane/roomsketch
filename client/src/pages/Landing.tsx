@@ -122,6 +122,7 @@ export default function Landing() {
             <a href="#how-it-works" onClick={scrollTo("how-it-works")} className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>How it works</a>
             <a href="#features" onClick={scrollTo("features")} className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>Features</a>
             <a href="#faq" onClick={scrollTo("faq")} className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>FAQ</a>
+            <a href="/get-embed" onClick={(e) => { e.preventDefault(); navigate("/get-embed"); }} className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>For businesses</a>
           </nav>
           <div className="flex items-center gap-3">
             <button

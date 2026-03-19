@@ -35,6 +35,8 @@ interface EditorCoreProps {
   renderHeader?: (editor: ReturnType<typeof useEditor>) => React.ReactNode;
   /** Render function for the status bar / attribution at the bottom of the properties panel. */
   renderStatusBar?: (state: ReturnType<typeof useEditor>["state"]) => React.ReactNode;
+  /** Optional callback fired after a successful PNG export. */
+  onExport?: () => void;
 }
 
 export default function EditorCore({
@@ -44,6 +46,7 @@ export default function EditorCore({
   isDark,
   renderHeader,
   renderStatusBar,
+  onExport,
 }: EditorCoreProps) {
   const editor = useEditor(storageKey);
   const { state } = editor;
@@ -367,11 +370,12 @@ export default function EditorCore({
             timestamp: new Date().toISOString(),
           });
         } catch { /* analytics should never break the app */ }
+        try { onExport?.(); } catch { /* never break the app */ }
       }, "image/png");
     } catch {
       showToast("Failed to save image");
     }
-  }, [state.roomName, showToast]);
+  }, [state.roomName, showToast, onExport]);
 
   const handleLoadPlan = useCallback(() => {
     const input = document.createElement("input");
