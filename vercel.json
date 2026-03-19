@@ -21,6 +21,7 @@
     { "src": "/how-it-works", "dest": "/how-it-works.html" },
     { "src": "/blog", "dest": "/blog/index.html" },
     { "src": "/blog/(.*)", "dest": "/blog/$1.html" },
+    { "src": "/(.+\\.(?:png|jpg|jpeg|svg|ico|webp|css|js|woff2?|ttf|json|xml|txt))$", "dest": "/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
