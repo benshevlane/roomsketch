@@ -3,6 +3,7 @@ import { parseEmbedParams } from "../lib/embed-params";
 import EditorCore from "../components/EditorCore";
 import PoweredByBadge from "../components/PoweredByBadge";
 import { trackEvent } from "@/lib/analytics";
+import { trackEmbedEvent } from "@/lib/embed-analytics";
 
 export default function Embed() {
   const params = useMemo(
@@ -28,6 +29,7 @@ export default function Embed() {
         partner: params.partner,
         referrer: document.referrer,
       });
+      trackEmbedEvent(params.partner, "embed_loaded");
     }
   }, [params.partner]);
 
@@ -86,6 +88,7 @@ export default function Embed() {
         units={params.units}
         hideToolbar={params.hideToolbar}
         isDark={isDark}
+        onExport={() => trackEmbedEvent(params.partner!, "plan_exported")}
       />
 
       <PoweredByBadge partnerId={params.partner} />

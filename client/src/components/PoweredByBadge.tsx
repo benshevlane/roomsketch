@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { trackEvent } from "@/lib/analytics";
+import { trackEmbedEvent } from "@/lib/embed-analytics";
 
 interface PoweredByBadgeProps {
   partnerId: string;
@@ -67,6 +68,7 @@ export default function PoweredByBadge({ partnerId }: PoweredByBadgeProps) {
     if (link) {
       link.addEventListener("click", () => {
         trackEvent("embed_badge_clicked", { partner: partnerId });
+        trackEmbedEvent(partnerId, "badge_clicked");
       });
     }
 
