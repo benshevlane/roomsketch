@@ -50,7 +50,7 @@ function generatePartnerId(businessName: string): string {
   return slug || "partner";
 }
 
-function buildEmbedSrc(partnerId: string, form: FormState): string {
+function buildEmbedSrc(partnerId: string, form: FormState, typeOverride?: string): string {
   const params = new URLSearchParams();
   params.set("partner", partnerId);
   if (form.brandColor !== DEFAULT_BRAND_COLOR) {
@@ -60,8 +60,10 @@ function buildEmbedSrc(partnerId: string, form: FormState): string {
     params.set("units", "ft");
   }
   params.set("embed", "true");
-  if (form.embedType === "fullpage" || form.embedType === "homepage") {
-    params.set("type", form.embedType);
+  params.set("source", "embed");
+  const embedType = typeOverride || form.embedType;
+  if (embedType === "fullpage" || embedType === "homepage" || embedType === "homepage-link") {
+    params.set("type", embedType === "homepage-link" ? "link" : embedType);
   }
   return `https://freeroomplanner.com/embed?${params.toString()}`;
 }
@@ -95,45 +97,56 @@ function buildHomepageLinkSnippet(form: FormState): string {
 </div>`;
 }
 
+function buildFullPageSnippet(partnerId: string, form: FormState): string {
+  const src = buildEmbedSrc(partnerId, form, "fullpage");
+  return `<!-- Free Room Planner Embed — Full Page -->
+<!-- Free to use. Powered by freeroomplanner.com -->
+<div style="width: 100%; height: 100vh; overflow: hidden;">
+  <iframe
+    src="${src}"
+    width="100%"
+    height="100vh"
+    style="border: none; display: block;"
+    title="Free Room Planner"
+    loading="lazy"
+  ></iframe>
+</div>`;
+}
+
+function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
+  const src = buildEmbedSrc(partnerId, form, "homepage");
+  const brandColor = form.brandColor || DEFAULT_BRAND_COLOR;
+  return `<!-- Free Room Planner Embed — Homepage -->
+<!-- Free to use. Powered by freeroomplanner.com -->
+<div id="frp-embed-root">
+  <div id="frp-preview" style="max-width: 560px; margin: 0 auto; border: 1px solid #e8e3d8; border-radius: 12px; padding: 24px; text-align: center; font-family: 'DM Sans', system-ui, -apple-system, sans-serif; background: #fff; cursor: pointer;" onclick="document.getElementById('frp-overlay').style.display='flex'">
+    <div style="margin-bottom: 12px;">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="4" y="8" width="40" height="32" rx="4" stroke="${brandColor}" stroke-width="2.5" fill="none"/><line x1="4" y1="16" x2="44" y2="16" stroke="${brandColor}" stroke-width="1.5" opacity="0.4"/><rect x="10" y="22" width="12" height="10" rx="2" fill="${brandColor}" opacity="0.15"/><rect x="26" y="22" width="12" height="10" rx="2" fill="${brandColor}" opacity="0.15"/></svg>
+    </div>
+    <div style="font-size: 18px; font-weight: 700; color: #1a1a18; margin-bottom: 4px;">Plan your room layout</div>
+    <div style="font-size: 14px; color: #6b6457; margin-bottom: 16px;">Design your space with our free drag-and-drop room planner.</div>
+    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 12px 28px; font-size: 15px; font-weight: 600; color: #fff; background: ${brandColor}; border-radius: 10px; text-decoration: none; font-family: inherit;">Start planning &#x2192;</span>
+    <div style="margin-top: 8px; font-size: 11px; color: #a09a8c;">Powered by <a href="https://freeroomplanner.com" style="color: #a09a8c; text-decoration: underline;" target="_blank" rel="noopener">freeroomplanner.com</a></div>
+  </div>
+  <div id="frp-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; background: #fff; flex-direction: column; align-items: stretch;">
+    <button onclick="document.getElementById('frp-overlay').style.display='none'" style="position: absolute; top: 12px; right: 16px; z-index: 10000; width: 36px; height: 36px; border-radius: 50%; border: 1px solid #e8e3d8; background: #fff; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6b6457; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">&times;</button>
+    <iframe src="${src}" width="100%" height="100%" style="border: none; display: block; flex: 1;" title="Free Room Planner" loading="lazy"></iframe>
+  </div>
+</div>`;
+}
+
+function buildFullPageSnippetForLink(partnerId: string, form: FormState): string {
+  return buildFullPageSnippet(partnerId, { ...form, embedType: "fullpage" });
+}
+
 function buildSnippet(partnerId: string, form: FormState): string {
   if (form.embedType === "homepage-link") {
     return buildHomepageLinkSnippet(form);
   }
-
-  const src = buildEmbedSrc(partnerId, form);
-
   if (form.embedType === "homepage") {
-    return `<!-- Free Room Planner Embed — Homepage -->
-<!-- Free to use. Powered by freeroomplanner.com -->
-<div id="frp-embed" style="width: 100%; height: 700px; border-radius: 8px; overflow: hidden; transition: height 0.4s ease;">
-  <iframe
-    src="${src}"
-    width="100%"
-    height="100%"
-    style="border: none;"
-    title="Free Room Planner"
-    loading="lazy"
-  ></iframe>
-</div>
-<script>
-window.addEventListener("message", function(e) {
-  if (e.data && e.data.type === "frp-expand") {
-    document.getElementById("frp-embed").style.height = "100vh";
+    return buildHomepageEmbedSnippet(partnerId, form);
   }
-});
-</script>`;
-  }
-
-  return `<!-- Free Room Planner Embed — Full Page -->
-<!-- Free to use. Powered by freeroomplanner.com -->
-<iframe
-  src="${src}"
-  width="100%"
-  height="100%"
-  style="border: none; min-height: 100vh;"
-  title="Free Room Planner"
-  loading="lazy"
-></iframe>`;
+  return buildFullPageSnippet(partnerId, form);
 }
 
 function buildPreviewSrc(partnerId: string, form: FormState): string {
@@ -146,6 +159,7 @@ function buildPreviewSrc(partnerId: string, form: FormState): string {
     params.set("units", "ft");
   }
   params.set("embed", "true");
+  params.set("source", "embed");
   if (form.embedType === "fullpage" || form.embedType === "homepage") {
     params.set("type", form.embedType);
   }
@@ -178,6 +192,7 @@ export default function GetEmbed() {
 
   // Copy state
   const [copied, setCopied] = useState(false);
+  const [copiedPlanner, setCopiedPlanner] = useState(false);
 
   // Preview loading state
   const [previewLoaded, setPreviewLoaded] = useState(false);
@@ -334,6 +349,25 @@ export default function GetEmbed() {
     setTimeout(() => setCopied(false), 2000);
   }, [partnerId, form]);
 
+  /* ---- Copy handler for planner snippet (homepage-link step 2) ---- */
+  const handleCopyPlanner = useCallback(async () => {
+    const snippet = buildFullPageSnippetForLink(partnerId, form);
+    try {
+      await navigator.clipboard.writeText(snippet);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = snippet;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+    setCopiedPlanner(true);
+    setTimeout(() => setCopiedPlanner(false), 2000);
+  }, [partnerId, form]);
+
   /* ---- Start over handler ---- */
   const handleStartOver = useCallback(() => {
     setStage("form");
@@ -343,6 +377,7 @@ export default function GetEmbed() {
     setPartnerId("");
     setResultName("");
     setCopied(false);
+    setCopiedPlanner(false);
     setPreviewLoaded(false);
     setShowPreview(true);
     setPlatformTab("wordpress");
@@ -607,39 +642,16 @@ export default function GetEmbed() {
 
               {/* How it works — contextual per embed type */}
               <div className={`mb-6 rounded-lg border p-4 ${border} ${isDark ? "bg-[#1e1e1c]" : "bg-[#f9f7f3]"}`}>
-                <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: "#3d8a7c" }}>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#3d8a7c" }}>
                   How it works
                 </p>
-                <div className="space-y-2.5">
-                  {(form.embedType === "fullpage"
-                    ? [
-                        "Create a new page on your website (e.g. /room-planner)",
-                        "Paste the embed code \u2014 it fills the whole page",
-                        "Your customers can plan their room immediately",
-                      ]
+                <p className={`text-sm ${muted}`}>
+                  {form.embedType === "fullpage"
+                    ? "Your visitors land directly on the planner. No clicks needed \u2014 they\u2019re straight into designing."
                     : form.embedType === "homepage"
-                    ? [
-                        "Paste the embed code on any page alongside your content",
-                        "It starts as a compact widget on your page",
-                        "When your customer starts planning, it expands to full screen",
-                      ]
-                    : [
-                        "Set up the full page embed on a dedicated page first",
-                        "Paste this banner on your homepage",
-                        "It links visitors to your room planner page",
-                      ]
-                  ).map((step, i) => (
-                    <div key={i} className="flex items-start gap-2.5">
-                      <span
-                        className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
-                        style={{ backgroundColor: "#3d8a7c" }}
-                      >
-                        {i + 1}
-                      </span>
-                      <span className={`text-sm ${muted}`}>{step}</span>
-                    </div>
-                  ))}
-                </div>
+                    ? "A compact \u2018Start Planning\u2019 button sits on your page. When clicked, the planner opens full screen over your site and can be closed to return to browsing."
+                    : "A small banner or button on your page links visitors to a dedicated planner page. You\u2019ll get two code snippets \u2014 one for the link and one for the planner page it points to."}
+                </p>
               </div>
 
               {/* Decision guide */}
@@ -647,18 +659,21 @@ export default function GetEmbed() {
                 <Accordion type="single" collapsible className="w-full">
                   <AccordionItem value="decision-guide" className={border}>
                     <AccordionTrigger className={`${muted} text-sm hover:no-underline`}>
-                      Not sure which to choose?
+                      Which should I choose?
                     </AccordionTrigger>
                     <AccordionContent>
-                      <div className={`space-y-2 text-sm ${muted}`}>
+                      <div className={`space-y-2.5 text-sm ${muted}`}>
                         <p>
-                          <strong className={text}>Full page</strong> — Best if you want a dedicated room planner page. Maximum screen space for your customers.
+                          Have a dedicated page for the planner? &rarr;{" "}
+                          <strong className={text}>Full page</strong>
                         </p>
                         <p>
-                          <strong className={text}>Homepage embed</strong> — Best if you want the planner alongside other content. Starts compact, expands when used.
+                          Want to add it alongside other content on your homepage? &rarr;{" "}
+                          <strong className={text}>Homepage embed</strong>
                         </p>
                         <p>
-                          <strong className={text}>Homepage link</strong> — Best if you already have the full page embed and want to promote it from your homepage.
+                          Prefer a simple link without embedding an iframe? &rarr;{" "}
+                          <strong className={text}>Homepage link</strong>
                         </p>
                       </div>
                     </AccordionContent>
@@ -730,75 +745,139 @@ export default function GetEmbed() {
               &larr; Start over
             </button>
 
-            {/* Homepage-link callout */}
-            {form.embedType === "homepage-link" && (
-              <div
-                className={`rounded-xl px-5 py-4 mb-6 border ${isDark ? "bg-[#2e2a1a] border-[#4a4230]" : "bg-[#fef9e8] border-[#e8ddb0]"}`}
-              >
-                <p className={`text-sm font-medium ${isDark ? "text-[#d4c87a]" : "text-[#8a7a30]"}`}>
-                  This is step 2 of 2. Make sure you&rsquo;ve already set up the{" "}
-                  <strong>full page embed</strong> on your planner page first.
+            {/* Recap sentence */}
+            <p className={`text-sm mb-6 ${muted}`}>
+              {form.embedType === "fullpage"
+                ? "You chose the full page embed \u2014 your visitors will land directly on the planner."
+                : form.embedType === "homepage"
+                ? "You chose the homepage embed \u2014 a compact button that expands to full screen when clicked."
+                : "You chose the homepage link \u2014 a banner linking to a dedicated planner page. You\u2019ll need two code snippets."}
+            </p>
+
+            {form.embedType === "homepage-link" ? (
+              <>
+                {/* Step 1: Homepage link snippet */}
+                <div className={`rounded-xl border p-5 sm:p-6 mb-6 ${cardBg} ${border}`}>
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <span
+                      className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                      style={{ backgroundColor: "#3d8a7c" }}
+                    >
+                      1
+                    </span>
+                    <h2 className="text-lg font-semibold">Add this to your homepage</h2>
+                  </div>
+                  <p className={`text-sm mb-4 ${muted}`}>
+                    Paste this banner on your homepage to link visitors to your planner page.
+                  </p>
+                  <div className="relative">
+                    <pre className="bg-[#1a1a18] text-[#e8e3d8] rounded-lg p-4 text-sm overflow-x-auto font-mono leading-relaxed">
+                      <code>{buildHomepageLinkSnippet(form)}</code>
+                    </pre>
+                    <button
+                      onClick={handleCopy}
+                      className={`absolute top-2 right-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        copied
+                          ? "bg-[#3d8a7c] text-white"
+                          : "bg-[#2e2e2a] hover:bg-[#3e3e3a] text-[#a09a8c]"
+                      }`}
+                    >
+                      {copied ? "Copied! \u2713" : "Copy code"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Step 2: Full page planner snippet */}
+                <div className={`rounded-xl border p-5 sm:p-6 mb-6 ${cardBg} ${border}`}>
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <span
+                      className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                      style={{ backgroundColor: "#3d8a7c" }}
+                    >
+                      2
+                    </span>
+                    <h2 className="text-lg font-semibold">Add this to your planner page</h2>
+                  </div>
+                  <p className={`text-sm mb-4 ${muted}`}>
+                    Paste this on the dedicated page your banner links to (e.g.{" "}
+                    <code className={`text-xs font-mono px-1 py-0.5 rounded ${isDark ? "bg-[#2e2e2a]" : "bg-[#f0ede6]"}`}>
+                      {form.plannerPageUrl.trim() || "/room-planner"}
+                    </code>
+                    ).
+                  </p>
+                  <div className="relative">
+                    <pre className="bg-[#1a1a18] text-[#e8e3d8] rounded-lg p-4 text-sm overflow-x-auto font-mono leading-relaxed">
+                      <code>{buildFullPageSnippetForLink(partnerId, form)}</code>
+                    </pre>
+                    <button
+                      onClick={handleCopyPlanner}
+                      className={`absolute top-2 right-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        copiedPlanner
+                          ? "bg-[#3d8a7c] text-white"
+                          : "bg-[#2e2e2a] hover:bg-[#3e3e3a] text-[#a09a8c]"
+                      }`}
+                    >
+                      {copiedPlanner ? "Copied! \u2713" : "Copy code"}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Single snippet for fullpage / homepage */
+              <div className={`rounded-xl border p-5 sm:p-6 mb-6 ${cardBg} ${border}`}>
+                <div className="flex items-center gap-2.5 mb-3">
+                  <span
+                    className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                    style={{ backgroundColor: "#3d8a7c" }}
+                  >
+                    1
+                  </span>
+                  <h2 className="text-lg font-semibold">Copy your code</h2>
+                </div>
+                <p className={`text-sm mb-4 ${muted}`}>
+                  Paste this into any page on your website.
+                </p>
+
+                <div className="relative">
+                  <pre className="bg-[#1a1a18] text-[#e8e3d8] rounded-lg p-4 text-sm overflow-x-auto font-mono leading-relaxed">
+                    <code>{buildSnippet(partnerId, form)}</code>
+                  </pre>
+                  <button
+                    onClick={handleCopy}
+                    className={`absolute top-2 right-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      copied
+                        ? "bg-[#3d8a7c] text-white"
+                        : "bg-[#2e2e2a] hover:bg-[#3e3e3a] text-[#a09a8c]"
+                    }`}
+                  >
+                    {copied ? "Copied! \u2713" : "Copy code"}
+                  </button>
+                </div>
+
+                <p className={`text-xs mt-4 ${muted}`}>
+                  This is your unique embed code. It will always show the &lsquo;Powered by
+                  freeroomplanner.com&rsquo; badge.
+                </p>
+                <p className={`text-xs mt-2 ${muted}`}>
+                  Want to remove the badge or use your own branding?{" "}
+                  <a
+                    href="mailto:hello@freeroomplanner.com"
+                    className={`${teal} hover:underline`}
+                  >
+                    Contact us about our partner plan &rarr;
+                  </a>
                 </p>
               </div>
             )}
 
-            {/* Step 1: Copy your code */}
+            {/* Platform instructions step */}
             <div className={`rounded-xl border p-5 sm:p-6 mb-6 ${cardBg} ${border}`}>
               <div className="flex items-center gap-2.5 mb-3">
                 <span
                   className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
                   style={{ backgroundColor: "#3d8a7c" }}
                 >
-                  1
-                </span>
-                <h2 className="text-lg font-semibold">Copy your code</h2>
-              </div>
-              <p className={`text-sm mb-4 ${muted}`}>
-                {form.embedType === "homepage-link"
-                  ? "Paste this HTML on your homepage."
-                  : "Paste this into any page on your website."}
-              </p>
-
-              {/* Code block */}
-              <div className="relative">
-                <pre className="bg-[#1a1a18] text-[#e8e3d8] rounded-lg p-4 text-sm overflow-x-auto font-mono leading-relaxed">
-                  <code>{buildSnippet(partnerId, form)}</code>
-                </pre>
-                <button
-                  onClick={handleCopy}
-                  className={`absolute top-2 right-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    copied
-                      ? "bg-[#3d8a7c] text-white"
-                      : "bg-[#2e2e2a] hover:bg-[#3e3e3a] text-[#a09a8c]"
-                  }`}
-                >
-                  {copied ? "Copied! \u2713" : "Copy code"}
-                </button>
-              </div>
-
-              <p className={`text-xs mt-4 ${muted}`}>
-                This is your unique embed code. It will always show the &lsquo;Powered by
-                freeroomplanner.com&rsquo; badge.
-              </p>
-              <p className={`text-xs mt-2 ${muted}`}>
-                Want to remove the badge or use your own branding?{" "}
-                <a
-                  href="mailto:hello@freeroomplanner.com"
-                  className={`${teal} hover:underline`}
-                >
-                  Contact us about our partner plan &rarr;
-                </a>
-              </p>
-            </div>
-
-            {/* Step 2: Choose your platform */}
-            <div className={`rounded-xl border p-5 sm:p-6 mb-6 ${cardBg} ${border}`}>
-              <div className="flex items-center gap-2.5 mb-3">
-                <span
-                  className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                  style={{ backgroundColor: "#3d8a7c" }}
-                >
-                  2
+                  {form.embedType === "homepage-link" ? 3 : 2}
                 </span>
                 <h2 className="text-lg font-semibold">Add it to your site</h2>
               </div>
@@ -861,14 +940,14 @@ export default function GetEmbed() {
               </div>
             </div>
 
-            {/* Step 3: Test it */}
+            {/* Test it step */}
             <div className={`rounded-xl border p-5 sm:p-6 mb-8 ${cardBg} ${border}`}>
               <div className="flex items-center gap-2.5 mb-3">
                 <span
                   className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
                   style={{ backgroundColor: "#3d8a7c" }}
                 >
-                  3
+                  {form.embedType === "homepage-link" ? 4 : 3}
                 </span>
                 <h2 className="text-lg font-semibold">Test it</h2>
               </div>

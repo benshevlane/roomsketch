@@ -8,7 +8,7 @@ export interface EmbedParams {
   hideToolbar: boolean;
   embed: boolean;
   source: string | null;
-  type: "fullpage" | "homepage" | null;
+  type: "fullpage" | "homepage" | "link" | null;
 }
 
 export function parseEmbedParams(searchString: string): EmbedParams {
@@ -56,9 +56,9 @@ export function parseEmbedParams(searchString: string): EmbedParams {
   }
 
   // type: layout mode
-  let type: "fullpage" | "homepage" | null = null;
+  let type: "fullpage" | "homepage" | "link" | null = null;
   const rawType = params.get("type");
-  if (rawType === "fullpage" || rawType === "homepage") {
+  if (rawType === "fullpage" || rawType === "homepage" || rawType === "link") {
     type = rawType;
   }
 
