@@ -3,7 +3,6 @@ import { UnitSystem } from "./types";
 export interface EmbedParams {
   partner: string | null;
   brandColor: string | null;
-  logoUrl: string | null;
   dark: boolean | null;
   units: UnitSystem;
   hideToolbar: boolean;
@@ -24,20 +23,6 @@ export function parseEmbedParams(searchString: string): EmbedParams {
   const rawColor = params.get("brand_color");
   if (rawColor && /^[0-9a-fA-F]{3,8}$/.test(rawColor)) {
     brandColor = rawColor;
-  }
-
-  // logoUrl: must be https:// only
-  let logoUrl: string | null = null;
-  const rawLogo = params.get("logo_url");
-  if (rawLogo) {
-    try {
-      const url = new URL(rawLogo);
-      if (url.protocol === "https:") {
-        logoUrl = rawLogo;
-      }
-    } catch {
-      // invalid URL, ignore
-    }
   }
 
   // dark: "1" = true, "0" = false, absent = null
@@ -62,7 +47,6 @@ export function parseEmbedParams(searchString: string): EmbedParams {
   return {
     partner,
     brandColor,
-    logoUrl,
     dark,
     units,
     hideToolbar,
