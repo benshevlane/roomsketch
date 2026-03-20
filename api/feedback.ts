@@ -1,6 +1,14 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Resend } from "resend";
-import { feedbackFormSchema } from "../shared/email-schemas";
+import { z } from "zod";
+
+const feedbackFormSchema = z.object({
+  type: z.enum(["bug", "feature", "general", "praise"], {
+    required_error: "Please select a feedback type",
+  }),
+  message: z.string().min(1, "Message is required").max(5000),
+  email: z.string().email("Please enter a valid email").optional().or(z.literal("")),
+});
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
