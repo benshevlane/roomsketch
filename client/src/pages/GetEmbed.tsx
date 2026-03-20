@@ -20,7 +20,8 @@ interface FormState {
   websiteUrl: string;
   brandColor: string;
   units: "m" | "ft";
-  embedType: "fullpage" | "homepage";
+  embedType: "fullpage" | "homepage" | "homepage-link";
+  plannerPageUrl: string;
 }
 
 const DEFAULT_BRAND_COLOR = "#6bbfa0";
@@ -32,6 +33,7 @@ const INITIAL_FORM: FormState = {
   brandColor: DEFAULT_BRAND_COLOR,
   units: "m",
   embedType: "fullpage",
+  plannerPageUrl: "",
 };
 
 /* ------------------------------------------------------------------ */
@@ -60,7 +62,40 @@ function buildEmbedSrc(partnerId: string, form: FormState): string {
   return `https://freeroomplanner.com/embed?${params.toString()}`;
 }
 
+function buildHomepageLinkSnippet(form: FormState): string {
+  const brandColor = form.brandColor || DEFAULT_BRAND_COLOR;
+  const plannerUrl = form.plannerPageUrl.trim() || "#";
+  return `<!-- Free Room Planner — Homepage Link -->
+<!-- Free to use. Powered by freeroomplanner.com -->
+<div style="max-width: 560px; margin: 0 auto; font-family: 'DM Sans', system-ui, -apple-system, sans-serif; box-sizing: border-box;">
+  <div style="border: 1px solid #e8e3d8; border-radius: 12px; padding: 20px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: #fff;">
+    <img
+      src="https://freeroomplanner.com/logo.png"
+      alt="Free Room Planner"
+      width="40"
+      height="40"
+      style="flex-shrink: 0; object-fit: contain;"
+    />
+    <div style="flex: 1; min-width: 160px;">
+      <div style="font-size: 16px; font-weight: 700; color: #1a1a18; margin: 0 0 2px; line-height: 1.3;">Plan your room layout</div>
+      <div style="font-size: 13px; color: #6b6457; line-height: 1.4; margin: 0;">Design your space with our free drag-and-drop room planner.</div>
+    </div>
+    <a
+      href="${plannerUrl}"
+      style="display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; font-size: 14px; font-weight: 600; color: #fff; background: ${brandColor}; border-radius: 10px; text-decoration: none; white-space: nowrap; flex-shrink: 0; font-family: inherit;"
+    >Start planning &#x2192;</a>
+  </div>
+  <div style="text-align: center; margin-top: 6px; font-size: 11px; color: #a09a8c;">
+    Powered by <a href="https://freeroomplanner.com" style="color: #a09a8c; text-decoration: underline;" target="_blank" rel="noopener">freeroomplanner.com</a>
+  </div>
+</div>`;
+}
+
 function buildSnippet(partnerId: string, form: FormState): string {
+  if (form.embedType === "homepage-link") {
+    return buildHomepageLinkSnippet(form);
+  }
+
   const src = buildEmbedSrc(partnerId, form);
 
   if (form.embedType === "homepage") {
@@ -189,6 +224,17 @@ export default function GetEmbed() {
           new URL(form.websiteUrl.trim());
         } catch {
           newErrors.websiteUrl = "Please enter a valid URL.";
+        }
+      }
+      if (form.embedType === "homepage-link") {
+        if (!form.plannerPageUrl.trim()) {
+          newErrors.plannerPageUrl = "A planner page URL is required for the homepage link.";
+        } else {
+          try {
+            new URL(form.plannerPageUrl.trim());
+          } catch {
+            newErrors.plannerPageUrl = "Please enter a valid URL.";
+          }
         }
       }
       if (Object.keys(newErrors).length > 0) {
@@ -482,8 +528,13 @@ export default function GetEmbed() {
                     },
                     {
                       value: "homepage" as const,
-                      title: "Homepage",
+                      title: "Homepage embed",
                       desc: "Best for embedding alongside other content. Starts compact and expands to full screen when your customer starts planning.",
+                    },
+                    {
+                      value: "homepage-link" as const,
+                      title: "Homepage link",
+                      desc: "A compact banner linking to your room planner page. No iframe — just paste the HTML on your homepage.",
                     },
                   ]).map((opt) => (
                     <button
@@ -515,6 +566,28 @@ export default function GetEmbed() {
                   ))}
                 </div>
               </div>
+
+              {/* Planner page URL — only for homepage-link */}
+              {form.embedType === "homepage-link" && (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium mb-1.5">
+                    Room planner page URL <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://yoursite.com/room-planner"
+                    value={form.plannerPageUrl}
+                    onChange={(e) => setField("plannerPageUrl", e.target.value)}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
+                  />
+                  {errors.plannerPageUrl && (
+                    <p className="text-red-500 text-xs mt-1">{errors.plannerPageUrl}</p>
+                  )}
+                  <p className={`text-xs mt-1 ${muted}`}>
+                    The page on your site where you host the full page embed.
+                  </p>
+                </div>
+              )}
 
               {/* Submit error */}
               {submitError && (
@@ -564,7 +637,9 @@ export default function GetEmbed() {
               <div className={`rounded-xl border p-5 sm:p-6 ${cardBg} ${border}`}>
                 <h2 className="text-lg font-semibold mb-1">Your embed code</h2>
                 <p className={`text-sm mb-4 ${muted}`}>
-                  Paste this into any page on your website
+                  {form.embedType === "homepage-link"
+                    ? "Paste this on your homepage"
+                    : "Paste this into any page on your website"}
                 </p>
 
                 {/* Code block */}
@@ -606,29 +681,39 @@ export default function GetEmbed() {
                   This is exactly what your customers will see
                 </p>
 
-                <div
-                  className={`relative rounded-lg border overflow-hidden ${border}`}
-                  style={{ height: form.embedType === "fullpage" ? 700 : 500 }}
-                >
-                  {!previewLoaded && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-8 h-8 border-2 border-[#3d8a7c] border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  )}
-                  <iframe
-                    src={buildPreviewSrc(partnerId, form)}
-                    width="100%"
-                    height="100%"
-                    style={{ border: "none", borderRadius: 8 }}
-                    title="Free Room Planner Preview"
-                    loading="lazy"
-                    onLoad={() => setPreviewLoaded(true)}
-                  />
-                </div>
+                {form.embedType === "homepage-link" ? (
+                  <div
+                    className={`rounded-lg border p-6 flex items-center justify-center ${border}`}
+                    style={{ minHeight: 140 }}
+                  >
+                    <div dangerouslySetInnerHTML={{ __html: buildSnippet(partnerId, form) }} />
+                  </div>
+                ) : (
+                  <div
+                    className={`relative rounded-lg border overflow-hidden ${border}`}
+                    style={{ height: form.embedType === "fullpage" ? 700 : 500 }}
+                  >
+                    {!previewLoaded && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-8 h-8 border-2 border-[#3d8a7c] border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                    <iframe
+                      src={buildPreviewSrc(partnerId, form)}
+                      width="100%"
+                      height="100%"
+                      style={{ border: "none", borderRadius: 8 }}
+                      title="Free Room Planner Preview"
+                      loading="lazy"
+                      onLoad={() => setPreviewLoaded(true)}
+                    />
+                  </div>
+                )}
 
                 <p className={`text-xs mt-3 ${muted}`}>
-                  The &lsquo;Powered by freeroomplanner.com&rsquo; badge appears in the bottom-right
-                  corner.
+                  {form.embedType === "homepage-link"
+                    ? "This is the banner your visitors will see on your homepage."
+                    : "The \u2018Powered by freeroomplanner.com\u2019 badge appears in the bottom-right corner."}
                 </p>
               </div>
             </div>
@@ -636,6 +721,12 @@ export default function GetEmbed() {
             {/* Installation instructions */}
             <div className={`rounded-xl border p-5 sm:p-6 ${cardBg} ${border}`}>
               <h2 className="text-lg font-semibold mb-4">How to add this to your website</h2>
+              {form.embedType === "homepage-link" && (
+                <p className={`text-sm mb-3 ${muted}`}>
+                  Paste the homepage link on your homepage, then use the{" "}
+                  <strong className={text}>full page embed</strong> on the page it links to.
+                </p>
+              )}
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="wordpress" className={border}>
                   <AccordionTrigger className={`${text} hover:no-underline`}>
