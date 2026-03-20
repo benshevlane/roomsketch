@@ -114,24 +114,10 @@ export default function Embed() {
               fontFamily: "'General Sans', 'DM Sans', system-ui, sans-serif",
             }}
           >
-            {/* Partner logo or default logo */}
-            {params.logoUrl ? (
-              <img
-                src={params.logoUrl}
-                alt=""
-                style={{
-                  maxHeight: 48,
-                  maxWidth: 200,
-                  objectFit: "contain",
-                  margin: "0 auto 20px",
-                  display: "block",
-                }}
-              />
-            ) : (
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
-                <FreeRoomPlannerLogo size={48} className={isDark ? "text-[#5ba89a]" : "text-[#3d8a7c]"} />
-              </div>
-            )}
+            {/* Logo */}
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+              <FreeRoomPlannerLogo size={48} className={isDark ? "text-[#5ba89a]" : "text-[#3d8a7c]"} />
+            </div>
 
             <h1
               style={{
@@ -192,24 +178,6 @@ export default function Embed() {
               Free to use. Powered by freeroomplanner.com
             </p>
           </div>
-        </div>
-      )}
-
-      {/* Optional branding strip */}
-      {params.logoUrl && (
-        <div
-          className="flex items-center px-3 py-1 border-b border-border bg-card"
-          style={params.brandColor ? { borderBottomColor: `var(--embed-brand-color)` } : undefined}
-        >
-          <img
-            src={params.logoUrl}
-            alt=""
-            style={{
-              maxHeight: "40px",
-              maxWidth: "200px",
-              objectFit: "contain",
-            }}
-          />
         </div>
       )}
 

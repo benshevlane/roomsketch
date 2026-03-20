@@ -19,7 +19,6 @@ interface FormState {
   email: string;
   websiteUrl: string;
   brandColor: string;
-  logoUrl: string;
   units: "m" | "ft";
   embedType: "fullpage" | "homepage";
 }
@@ -31,7 +30,6 @@ const INITIAL_FORM: FormState = {
   email: "",
   websiteUrl: "",
   brandColor: DEFAULT_BRAND_COLOR,
-  logoUrl: "",
   units: "m",
   embedType: "fullpage",
 };
@@ -58,9 +56,6 @@ function buildEmbedSrc(partnerId: string, form: FormState): string {
   }
   if (form.units === "ft") {
     params.set("units", "ft");
-  }
-  if (form.logoUrl.trim()) {
-    params.set("logo_url", form.logoUrl.trim());
   }
   return `https://freeroomplanner.com/embed?${params.toString()}`;
 }
@@ -111,9 +106,6 @@ function buildPreviewSrc(partnerId: string, form: FormState): string {
   if (form.units === "ft") {
     params.set("units", "ft");
   }
-  if (form.logoUrl.trim()) {
-    params.set("logo_url", form.logoUrl.trim());
-  }
   return `/embed?${params.toString()}`;
 }
 
@@ -137,8 +129,6 @@ export default function GetEmbed() {
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [logoError, setLogoError] = useState<string | null>(null);
-
   // Result state
   const [partnerId, setPartnerId] = useState("");
   const [resultName, setResultName] = useState("");
@@ -180,16 +170,6 @@ export default function GetEmbed() {
     [],
   );
 
-  /* ---- Logo URL blur validation ---- */
-  const validateLogoOnBlur = useCallback(() => {
-    const val = form.logoUrl.trim();
-    if (val && !val.startsWith("https://")) {
-      setLogoError("Logo URL must start with https://");
-    } else {
-      setLogoError(null);
-    }
-  }, [form.logoUrl]);
-
   /* ---- Submit handler ---- */
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -203,9 +183,6 @@ export default function GetEmbed() {
         newErrors.email = "Email is required.";
       } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
         newErrors.email = "Please enter a valid email address.";
-      }
-      if (form.logoUrl.trim() && !form.logoUrl.trim().startsWith("https://")) {
-        newErrors.logoUrl = "Logo URL must start with https://";
       }
       if (form.websiteUrl.trim()) {
         try {
@@ -252,7 +229,6 @@ export default function GetEmbed() {
                 email: form.email.trim(),
                 website_url: form.websiteUrl.trim() || null,
                 brand_color: brandChanged ? form.brandColor.replace("#", "") : null,
-                logo_url: form.logoUrl.trim() || null,
                 units: form.units,
               });
 
@@ -306,7 +282,6 @@ export default function GetEmbed() {
     setForm(INITIAL_FORM);
     setErrors({});
     setSubmitError(null);
-    setLogoError(null);
     setPartnerId("");
     setResultName("");
     setCopied(false);
@@ -472,22 +447,6 @@ export default function GetEmbed() {
                   />
                   <span className={`text-sm font-mono ${muted}`}>{form.brandColor}</span>
                 </div>
-              </div>
-
-              {/* Logo URL */}
-              <div className="mb-5">
-                <label className="block text-sm font-medium mb-1.5">Logo URL</label>
-                <input
-                  type="text"
-                  placeholder="https://yoursite.com/logo.png"
-                  value={form.logoUrl}
-                  onChange={(e) => setField("logoUrl", e.target.value)}
-                  onBlur={validateLogoOnBlur}
-                  className={`w-full px-3 py-2 rounded-lg border text-sm outline-none focus:ring-2 focus:ring-[#3d8a7c]/40 transition ${inputBg}`}
-                />
-                {(errors.logoUrl || logoError) && (
-                  <p className="text-red-500 text-xs mt-1">{errors.logoUrl || logoError}</p>
-                )}
               </div>
 
               {/* Units preference */}
