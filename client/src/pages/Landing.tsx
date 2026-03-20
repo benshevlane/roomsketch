@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import FreeRoomPlannerLogo from "@/components/FreeRoomPlannerLogo";
+import ContactFormDialog from "@/components/ContactFormDialog";
+import FeedbackFormDialog from "@/components/FeedbackFormDialog";
 import { useDocumentMeta } from "@/hooks/use-document-meta";
 import { supabase } from "@/lib/supabase";
 
@@ -86,6 +88,8 @@ export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [isDark, setIsDark] = useState(false);
   const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useEffect(() => {
     setIsDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -529,9 +533,14 @@ export default function Landing() {
             <span>Free Room Planner</span>
           </div>
           <a href="/get-embed" onClick={(e) => { e.preventDefault(); navigate("/get-embed"); }} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>For businesses</a>
+          <button onClick={() => setContactOpen(true)} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Contact us</button>
+          <button onClick={() => setFeedbackOpen(true)} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Feedback</button>
           <span>© {new Date().getFullYear()} Free Room Planner. Free to use.</span>
         </div>
       </footer>
+
+      <ContactFormDialog open={contactOpen} onOpenChange={setContactOpen} />
+      <FeedbackFormDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
 
       <style>{`
         .rs-fade { opacity: 0; transform: translateY(16px); transition: opacity 0.6s ease, transform 0.6s ease; }
