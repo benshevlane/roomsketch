@@ -44,6 +44,8 @@
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
     <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <style>/* Anti-FOUC: hide SEO fallback until React mounts */
+    .seo-shell { visibility: hidden; position: absolute; }</style>
     <noscript>
       <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -110,6 +112,7 @@
   <body>
     <div id="root">
       <!-- Pre-rendered content for SEO — React replaces this on mount -->
+      <div class="seo-shell">
       <header style="padding:1rem;text-align:center">
         <nav>
           <a href="/">Free Room Planner</a> |
@@ -167,6 +170,7 @@
       <footer style="padding:1rem;text-align:center">
         <p>&copy; 2026 Free Room Planner. Free to use.</p>
       </footer>
+      </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
