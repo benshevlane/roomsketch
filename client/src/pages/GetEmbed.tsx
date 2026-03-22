@@ -307,18 +307,6 @@ export default function GetEmbed() {
               if (insertErr) {
                 console.warn("Supabase insert error:", insertErr.message);
                 setSubmitError("Something went wrong — please try again.");
-              } else {
-                // Notify admin of new partner signup (fire-and-forget)
-                fetch("/api/embed/notify-signup", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    partnerId: candidateId,
-                    businessName: form.businessName.trim(),
-                    email: form.email.trim(),
-                    websiteUrl: form.websiteUrl.trim() || undefined,
-                  }),
-                }).catch(() => {});
               }
               finalId = candidateId;
               break;
@@ -331,6 +319,18 @@ export default function GetEmbed() {
           setSubmitError("Something went wrong — please try again.");
         }
       }
+
+      // Notify admin of new partner signup (fire-and-forget)
+      fetch("/api/embed/notify-signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          partnerId: finalId,
+          businessName: form.businessName.trim(),
+          email: form.email.trim(),
+          websiteUrl: form.websiteUrl.trim() || undefined,
+        }),
+      }).catch(() => {});
 
       // Always proceed to Stage 2
       setPartnerId(finalId);
