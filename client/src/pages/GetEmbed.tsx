@@ -70,7 +70,7 @@ function buildEmbedSrc(partnerId: string, form: FormState, typeOverride?: string
 
 function buildHomepageLinkSnippet(form: FormState): string {
   const brandColor = form.brandColor || DEFAULT_BRAND_COLOR;
-  const plannerUrl = form.plannerPageUrl.trim() || "#";
+  const plannerUrl = form.plannerPageUrl.trim() || "https://freeroomplanner.com/embed";
   return `<!-- Free Room Planner — Homepage Link -->
 <!-- Free to use. Powered by freeroomplanner.com -->
 <div style="max-width: 560px; margin: 0 auto; font-family: 'DM Sans', system-ui, -apple-system, sans-serif; box-sizing: border-box;">
