@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import { Resend } from "resend";
 import { storage } from "./storage";
 import { supabaseAdmin } from "./supabase";
-import { contactFormSchema, feedbackFormSchema } from "../shared/email-schemas";
+import { contactFormSchema, feedbackFormSchema, embedSignupNotificationSchema } from "../shared/email-schemas";
 
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (req.session?.isAdmin) return next();
@@ -161,6 +161,38 @@ export async function registerRoutes(
   app.delete("/api/admin/hero-image", requireAdmin, async (_req, res) => {
     await deleteHeroImage();
     res.json({ ok: true });
+  });
+
+  // Embed partner signup notification
+  app.post("/api/embed/notify-signup", async (req, res) => {
+    if (!process.env.RESEND_API_KEY) {
+      return res.status(503).json({ error: "Email service not configured" });
+    }
+    const parsed = embedSignupNotificationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    }
+    const { partnerId, businessName, email, websiteUrl } = parsed.data;
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      await resend.emails.send({
+        from: process.env.EMAIL_FROM || "Free Room Planner <noreply@send.freeroomplanner.com>",
+        to: process.env.CONTACT_EMAIL || "ben@freeroomplanner.com",
+        replyTo: email,
+        subject: `[New Embed Partner] ${businessName}`,
+        html: `<h2>New Embed Partner Signup</h2>
+<p>A new partner signed up and got their embed code.</p>
+<p><strong>Business:</strong> ${businessName}</p>
+<p><strong>Partner ID:</strong> ${partnerId}</p>
+<p><strong>Email:</strong> ${email}</p>
+${websiteUrl ? `<p><strong>Website:</strong> <a href="${websiteUrl}">${websiteUrl}</a></p>` : ""}
+<p><strong>Time:</strong> ${new Date().toUTCString()}</p>`,
+      });
+      return res.json({ ok: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to send notification";
+      return res.status(500).json({ error: msg });
+    }
   });
 
   // Contact form
