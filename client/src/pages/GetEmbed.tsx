@@ -26,6 +26,10 @@ interface FormState {
 
 const DEFAULT_BRAND_COLOR = "#6bbfa0";
 
+// Inline SVG logo for embed snippets — avoids cross-origin loading issues
+const LOGO_SVG_DATA_URI =
+  "data:image/svg+xml,%3Csvg%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2032%2032%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%226%22%20fill%3D%22%233d8a7c%22%2F%3E%3Crect%20x%3D%225%22%20y%3D%225%22%20width%3D%2222%22%20height%3D%2222%22%20rx%3D%221.5%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20fill%3D%22none%22%2F%3E%3Cline%20x1%3D%225%22%20y1%3D%2214%22%20x2%3D%2218%22%20y2%3D%2214%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.8%22%2F%3E%3Cline%20x1%3D%2218%22%20y1%3D%2214%22%20x2%3D%2218%22%20y2%3D%2227%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.8%22%2F%3E%3Cpath%20d%3D%22M%2018%2014%20A%204%204%200%200%201%2022%2014%22%20stroke%3D%22rgba(255%2C255%2C255%2C0.7)%22%20stroke-width%3D%221.2%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E";
+
 const INITIAL_FORM: FormState = {
   businessName: "",
   email: "",
@@ -76,11 +80,11 @@ function buildHomepageLinkSnippet(form: FormState): string {
 <div style="max-width: 560px; margin: 0 auto; font-family: 'DM Sans', system-ui, -apple-system, sans-serif; box-sizing: border-box;">
   <div style="border: 1px solid #e8e3d8; border-radius: 12px; padding: 20px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: #fff;">
     <img
-      src="https://freeroomplanner.com/logo.png"
+      src="${LOGO_SVG_DATA_URI}"
       alt="Free Room Planner"
       width="40"
       height="40"
-      style="flex-shrink: 0; object-fit: contain;"
+      style="flex-shrink: 0; border-radius: 6px;"
     />
     <div style="flex: 1; min-width: 160px;">
       <div style="font-size: 16px; font-weight: 700; color: #1a1a18; margin: 0 0 2px; line-height: 1.3;">Plan your room layout</div>
@@ -169,7 +173,7 @@ function buildHomepageEmbedSnippet(partnerId: string, form: FormState): string {
   card.id = 'frp-card';
   card.innerHTML =
     '<div id="frp-header">' +
-      '<img id="frp-logo" src="https://freeroomplanner.com/logo.png" alt="Free Room Planner" width="56" height="56" style="object-fit:contain;">' +
+      '<img id="frp-logo" src="${LOGO_SVG_DATA_URI}" alt="Free Room Planner" width="56" height="56" style="border-radius:8px;">' +
       '<div id="frp-text" style="flex:1">' +
         '<p id="frp-title">Plan your room layout</p>' +
         '<p id="frp-desc">Design your space with our free drag-and-drop room planner.</p>' +

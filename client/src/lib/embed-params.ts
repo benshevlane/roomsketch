@@ -55,11 +55,13 @@ export function parseEmbedParams(searchString: string): EmbedParams {
     source = rawSource;
   }
 
-  // type: layout mode
+  // type: layout mode ("card" is a legacy alias for "homepage")
   let type: "fullpage" | "homepage" | "link" | null = null;
   const rawType = params.get("type");
   if (rawType === "fullpage" || rawType === "homepage" || rawType === "link") {
     type = rawType;
+  } else if (rawType === "card") {
+    type = "homepage";
   }
 
   // Silently ignore any badge-hiding parameters
