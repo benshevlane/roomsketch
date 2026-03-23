@@ -765,16 +765,37 @@ export default function GetEmbed() {
                 </div>
               </div>
 
-              {/* How it works — contextual per embed type */}
+              {/* Instructions — contextual per embed type */}
               <div className={`mb-6 rounded-lg border p-4 ${border} ${isDark ? "bg-[#1e1e1c]" : "bg-[#f9f7f3]"}`}>
                 <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "#3d8a7c" }}>
-                  How it works
+                  Instructions
                 </p>
-                <div className={`space-y-3 text-sm ${muted}`}>
-                  <p><span className={`font-semibold ${text}`}>Customer plans their room</span> — They use the planner on your website before contacting you</p>
-                  <p><span className={`font-semibold ${text}`}>They enquire with a layout ready</span> — Dimensions, space, and ideas mapped out before the first call</p>
-                  <p><span className={`font-semibold ${text}`}>You quote faster and convert more</span> — Less back-and-forth. Better-informed customers. More sales.</p>
-                </div>
+                <ol className={`space-y-2 text-sm ${muted} list-decimal list-inside`}>
+                  {form.embedType === "fullpage" && (
+                    <>
+                      <li>Create a <span className={`font-semibold ${text}`}>new blank page</span> on your website (e.g. <code className="text-xs px-1 py-0.5 rounded bg-black/5 dark:bg-white/10">/room-planner</code>)</li>
+                      <li>Paste the embed code into the page's HTML — it will <span className={`font-semibold ${text}`}>fill the entire viewport</span></li>
+                      <li>Remove any headers, footers, or sidebars so the planner runs <span className={`font-semibold ${text}`}>edge-to-edge</span></li>
+                      <li>Link to the page from your navigation or a <span className={`font-semibold ${text}`}>call-to-action button</span></li>
+                    </>
+                  )}
+                  {form.embedType === "homepage" && (
+                    <>
+                      <li>Paste the embed code <span className={`font-semibold ${text}`}>wherever you want the planner card</span> to appear on your page</li>
+                      <li>It loads as a compact card with a <span className={`font-semibold ${text}`}>"Start planning"</span> button — no iframe until clicked</li>
+                      <li>When a visitor clicks, the card <span className={`font-semibold ${text}`}>expands inline</span> to reveal the full planner</li>
+                      <li>Works alongside your existing content — <span className={`font-semibold ${text}`}>no extra pages needed</span></li>
+                    </>
+                  )}
+                  {form.embedType === "homepage-link" && (
+                    <>
+                      <li>Create a <span className={`font-semibold ${text}`}>dedicated planner page</span> on your site and embed the full-page code there (provided after signup)</li>
+                      <li>Enter that page's URL in the <span className={`font-semibold ${text}`}>"Planner page URL"</span> field below</li>
+                      <li>Paste the <span className={`font-semibold ${text}`}>banner code</span> on your homepage or any page where you want to promote the planner</li>
+                      <li>Visitors click the banner and are <span className={`font-semibold ${text}`}>taken to your planner page</span></li>
+                    </>
+                  )}
+                </ol>
               </div>
 
               {/* Decision guide */}
