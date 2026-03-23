@@ -540,6 +540,7 @@ export default function EditorCore({
           onSetLabelOffset={editor.setLabelOffset}
           onSetTool={editor.setTool}
           onSetRoomLabelOffset={editor.setRoomLabelOffset}
+          onSetWallDimensionLabelOffset={editor.setWallDimensionLabelOffset}
         />
 
         {/* Desktop: Properties sidebar */}

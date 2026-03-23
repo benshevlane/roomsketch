@@ -30,6 +30,7 @@ function saveStateToStorage(state: EditorState, storageKey: string): void {
       roomNames: state.roomNames,
       roomLabelOffsets: state.roomLabelOffsets,
       componentLabelsVisible: state.componentLabelsVisible,
+      wallDimensionLabelOffsets: state.wallDimensionLabelOffsets,
     };
     localStorage.setItem(storageKey, JSON.stringify(data));
   } catch {
@@ -52,6 +53,7 @@ function deepCopyState(s: EditorState): EditorState {
     arrows: s.arrows.map(a => ({ ...a })),
     roomNames: { ...s.roomNames },
     roomLabelOffsets: { ...s.roomLabelOffsets },
+    wallDimensionLabelOffsets: { ...s.wallDimensionLabelOffsets },
     panOffset: { ...s.panOffset },
   };
 }
@@ -83,6 +85,7 @@ const DEFAULT_STATE: EditorState = {
   roomNames: {},
   roomLabelOffsets: {},
   componentLabelsVisible: true,
+  wallDimensionLabelOffsets: {},
 };
 
 function getInitialState(storageKey: string): EditorState {
@@ -103,6 +106,7 @@ function getInitialState(storageKey: string): EditorState {
     roomNames: saved.roomNames ?? {},
     roomLabelOffsets: saved.roomLabelOffsets ?? {},
     componentLabelsVisible: saved.componentLabelsVisible ?? true,
+    wallDimensionLabelOffsets: (saved as any).wallDimensionLabelOffsets ?? {},
   };
 }
 
@@ -141,7 +145,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
   // Auto-save plan data to localStorage whenever it changes
   useEffect(() => {
     saveStateToStorage(state, storageKey);
-  }, [state.walls, state.furniture, state.labels, state.textBoxes, state.arrows, state.roomName, state.roomNames, state.componentLabelsVisible, storageKey]);
+  }, [state.walls, state.furniture, state.labels, state.textBoxes, state.arrows, state.roomName, state.roomNames, state.componentLabelsVisible, state.wallDimensionLabelOffsets, storageKey]);
 
   const setTool = useCallback((tool: EditorTool) => {
     setState((s) => ({ ...s, selectedTool: tool, selectedItemId: null, wallDrawing: null, wallChainStart: null }));
@@ -306,6 +310,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
       textBoxes: [],
       arrows: [],
       roomNames: {},
+      wallDimensionLabelOffsets: {},
       selectedItemId: null,
       wallDrawing: null,
     }));
@@ -433,6 +438,13 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     }));
   }, []);
 
+  const setWallDimensionLabelOffset = useCallback((wallKey: string, offset: Point) => {
+    setState((s) => ({
+      ...s,
+      wallDimensionLabelOffsets: { ...s.wallDimensionLabelOffsets, [wallKey]: offset },
+    }));
+  }, []);
+
   const toggleComponentLabels = useCallback(() => {
     setState((s) => ({ ...s, componentLabelsVisible: !s.componentLabelsVisible }));
   }, []);
@@ -449,8 +461,9 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
       roomNames: state.roomNames,
       roomLabelOffsets: state.roomLabelOffsets,
       componentLabelsVisible: state.componentLabelsVisible,
+      wallDimensionLabelOffsets: state.wallDimensionLabelOffsets,
     };
-  }, [state.roomName, state.walls, state.furniture, state.labels, state.textBoxes, state.arrows, state.roomNames, state.roomLabelOffsets, state.componentLabelsVisible]);
+  }, [state.roomName, state.walls, state.furniture, state.labels, state.textBoxes, state.arrows, state.roomNames, state.roomLabelOffsets, state.componentLabelsVisible, state.wallDimensionLabelOffsets]);
 
   const importState = useCallback((plan: { version: number; roomName: string; walls: Wall[]; furniture: FurnitureItem[]; labels: RoomLabel[]; textBoxes?: TextBox[]; arrows?: Arrow[]; roomNames?: Record<string, string>; componentLabelsVisible?: boolean }) => {
     pushUndo();
@@ -514,6 +527,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     splitWallAndConnect,
     setRoomNameForRoom,
     setRoomLabelOffset,
+    setWallDimensionLabelOffset,
     toggleComponentLabels,
   };
 }

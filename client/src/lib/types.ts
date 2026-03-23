@@ -198,6 +198,8 @@ export interface EditorState {
   roomLabelOffsets: Record<string, Point>;
   // Toggle for component labels visibility
   componentLabelsVisible: boolean;
+  // Wall dimension label position offsets keyed by wall ID (or collinear group key)
+  wallDimensionLabelOffsets: Record<string, Point>;
 }
 
 export interface FurnitureTemplate {

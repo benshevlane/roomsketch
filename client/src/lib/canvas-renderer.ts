@@ -563,71 +563,9 @@ export function drawWalls(
     ctx.fill();
   });
 
-  // Identify doors/windows for occupant checks
-  const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
-
-  // Draw individual labels for non-merged walls (skip if wall has door/window occupants — total shown separately)
-  walls.forEach((wall) => {
-    if (mergedWallIds.has(wall.id)) return; // will be labeled by group
-
-    const wallThick = wall.thickness || 15;
-
-    // Skip walls with door/window occupants — total measurement is drawn by drawWallSegmentMeasurements
-    const occupants = getWallOccupants(wall.start, wall.end, wallThick, doorsWindows);
-    if (occupants.length > 0) return;
-
-    const dx = wall.end.x - wall.start.x;
-    const dy = wall.end.y - wall.start.y;
-    const lengthCm = Math.sqrt(dx * dx + dy * dy);
-    if (lengthCm <= 10) return;
-
-    const { startExtension, endExtension } = measureMode === "full"
-      ? getEndpointExtensions(wall.start, wall.end, wallThick, walls)
-      : { startExtension: 0, endExtension: 0 };
-    const udx = dx / lengthCm;
-    const udy = dy / lengthCm;
-
-    const sx = (wall.start.x - udx * startExtension) * pxPerCm + panOffset.x;
-    const sy = (wall.start.y - udy * startExtension) * pxPerCm + panOffset.y;
-    const ex = (wall.end.x + udx * endExtension) * pxPerCm + panOffset.x;
-    const ey = (wall.end.y + udy * endExtension) * pxPerCm + panOffset.y;
-
-    const displayLengthCm = measureMode === "inside"
-      ? Math.max(0, lengthCm - wallThick)
-      : lengthCm + startExtension + endExtension;
-    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, wall.thickness * pxPerCm, zoom, isDark, units, wall, furniture, gridSize, panOffset, rooms, walls, measureMode);
-  });
-
-  // Draw merged labels for collinear groups (skip if group has door/window occupants)
-  for (const group of collinearGroups.values()) {
-    const representativeWallForThickness = walls.find((w) => group.wallIds.has(w.id));
-    const thickness = representativeWallForThickness?.thickness ?? 15;
-
-    // Skip groups with door/window occupants — total measurement is drawn by drawWallSegmentMeasurements
-    const groupOccupants = getWallOccupants(group.minP, group.maxP, thickness, doorsWindows);
-    if (groupOccupants.length > 0) continue;
-
-    const { startExtension, endExtension } = measureMode === "full"
-      ? getEndpointExtensions(group.minP, group.maxP, thickness, walls)
-      : { startExtension: 0, endExtension: 0 };
-    const gdx = group.maxP.x - group.minP.x;
-    const gdy = group.maxP.y - group.minP.y;
-    const glen = Math.sqrt(gdx * gdx + gdy * gdy);
-    const gudx = glen > 0 ? gdx / glen : 0;
-    const gudy = glen > 0 ? gdy / glen : 0;
-
-    const sx = (group.minP.x - gudx * startExtension) * pxPerCm + panOffset.x;
-    const sy = (group.minP.y - gudy * startExtension) * pxPerCm + panOffset.y;
-    const ex = (group.maxP.x + gudx * endExtension) * pxPerCm + panOffset.x;
-    const ey = (group.maxP.y + gudy * endExtension) * pxPerCm + panOffset.y;
-    const displayLengthCm = measureMode === "inside"
-      ? Math.max(0, group.totalLengthCm - thickness)
-      : group.totalLengthCm + startExtension + endExtension;
-    // Find the actual wall for collision detection
-    const groupWallIds = group.wallIds;
-    const representativeWall = walls.find((w) => groupWallIds.has(w.id)) || walls[0];
-    drawWallDimensionLabel(ctx, sx, sy, ex, ey, displayLengthCm, thickness * pxPerCm, zoom, isDark, units, representativeWall, furniture, gridSize, panOffset, rooms, walls, measureMode);
-  }
+  // Wall dimension labels are now collected and drawn separately via
+  // collectWallDimensionLabelRects() + resolveAndDrawLabelCollisions()
+  // so they render above furniture and participate in collision resolution.
 }
 
 /** Draw the total wall length as a solid dimension line on the opposite side from segment measurements.
@@ -1453,6 +1391,276 @@ function drawWallDimensionLabel(
   ctx.fillText(text, 0, 0);
 
   ctx.restore();
+}
+
+/** Info for a wall dimension label — used for deferred rendering and collision resolution */
+export interface WallDimensionLabelInfo {
+  wallKey: string;       // wall ID or collinear group root key
+  text: string;
+  centerX: number;       // screen px (default position, before user offset)
+  centerY: number;       // screen px
+  halfW: number;         // half-width in screen px
+  halfH: number;         // half-height in screen px
+  angle: number;         // rotation angle in radians (aligned with wall)
+  anchorX: number;       // default anchor X (before user offset)
+  anchorY: number;       // default anchor Y
+  isDark: boolean;
+  zoom: number;
+}
+
+/** Collect wall dimension label positions without drawing.
+ *  Returns info needed for deferred rendering via resolveAndDrawLabelCollisions. */
+export function collectWallDimensionLabelRects(
+  ctx: CanvasRenderingContext2D,
+  walls: Wall[],
+  gridSize: number,
+  zoom: number,
+  panOffset: Point,
+  isDark: boolean,
+  units: UnitSystem,
+  measureMode: MeasureMode,
+  furniture: FurnitureItem[],
+  rooms: DetectedRoom[],
+  wallDimensionLabelOffsets: Record<string, Point> = {}
+): WallDimensionLabelInfo[] {
+  const pxPerCm = (gridSize * zoom) / 100;
+  const results: WallDimensionLabelInfo[] = [];
+
+  const collinearGroups = findCollinearGroups(walls);
+  const mergedWallIds = new Set<string>();
+  for (const group of collinearGroups.values()) {
+    for (const id of group.wallIds) mergedWallIds.add(id);
+  }
+
+  const doorsWindows = furniture.filter(
+    (f) => f.type === "door" || f.type === "door_double" || f.type === "window"
+  );
+
+  // Helper to compute label info for a wall segment
+  function computeLabelInfo(
+    wallStart: Point, wallEnd: Point,
+    wallThick: number,
+    lengthCm: number,
+    displayLengthCm: number,
+    wallKey: string,
+    representativeWall: Wall
+  ): WallDimensionLabelInfo | null {
+    if (lengthCm <= 10) return null;
+
+    const { startExtension, endExtension } = measureMode === "full"
+      ? getEndpointExtensions(wallStart, wallEnd, wallThick, walls)
+      : { startExtension: 0, endExtension: 0 };
+    const dx = wallEnd.x - wallStart.x;
+    const dy = wallEnd.y - wallStart.y;
+    const udx = lengthCm > 0 ? dx / lengthCm : 0;
+    const udy = lengthCm > 0 ? dy / lengthCm : 0;
+
+    const sx = (wallStart.x - udx * startExtension) * pxPerCm + panOffset.x;
+    const sy = (wallStart.y - udy * startExtension) * pxPerCm + panOffset.y;
+    const ex = (wallEnd.x + udx * endExtension) * pxPerCm + panOffset.x;
+    const ey = (wallEnd.y + udy * endExtension) * pxPerCm + panOffset.y;
+
+    const finalDisplayCm = measureMode === "inside"
+      ? Math.max(0, displayLengthCm - wallThick)
+      : displayLengthCm + startExtension + endExtension;
+
+    const angle = Math.atan2(ey - sy, ex - sx);
+    const wallLengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
+
+    const baseFontSize = Math.max(11, 12 * zoom);
+    const text = formatLength(finalDisplayCm, units);
+    ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    const textWidth = ctx.measureText(text).width;
+    const pad = 4;
+
+    // Find optimal position along wall avoiding doors/windows
+    let labelFrac = 0.5;
+    const occupants = findComponentsOnWall(representativeWall, furniture, gridSize, zoom, panOffset);
+    if (occupants.length > 0) {
+      const textFrac = wallLengthPx > 0 ? (textWidth + pad * 2) / wallLengthPx : 1;
+      const result = findOptimalLabelPosition(occupants, textFrac);
+      labelFrac = result.position;
+    }
+
+    const mx = sx + (ex - sx) * labelFrac;
+    const my = sy + (ey - sy) * labelFrac;
+
+    // Determine inside normal direction
+    const normX = -Math.sin(angle);
+    const normY = Math.cos(angle);
+    let insideNormX = normX;
+    let insideNormY = normY;
+
+    const wallMid = { x: (representativeWall.start.x + representativeWall.end.x) / 2, y: (representativeWall.start.y + representativeWall.end.y) / 2 };
+    const wdx = representativeWall.end.x - representativeWall.start.x;
+    const wdy = representativeWall.end.y - representativeWall.start.y;
+    const wlen = Math.sqrt(wdx * wdx + wdy * wdy);
+    if (wlen > 0) {
+      const wnx = -wdy / wlen;
+      const wny = wdx / wlen;
+
+      let foundRoom = false;
+      let bestRoom: DetectedRoom | null = null;
+      for (const room of rooms) {
+        const hasStart = room.vertices.some(v =>
+          Math.sqrt((v.x - representativeWall.start.x) ** 2 + (v.y - representativeWall.start.y) ** 2) < 15
+        );
+        const hasEnd = room.vertices.some(v =>
+          Math.sqrt((v.x - representativeWall.end.x) ** 2 + (v.y - representativeWall.end.y) ** 2) < 15
+        );
+        if (hasStart && hasEnd) {
+          if (!bestRoom || room.area > bestRoom.area) bestRoom = room;
+        }
+      }
+      if (bestRoom) {
+        const insideNormal = computeInsideNormal(representativeWall, bestRoom.vertices);
+        if (insideNormal) {
+          const dot = insideNormal.nx * normX + insideNormal.ny * normY;
+          insideNormX = dot >= 0 ? normX : -normX;
+          insideNormY = dot >= 0 ? normY : -normY;
+          foundRoom = true;
+        }
+      }
+
+      if (!foundRoom && walls.length > 0) {
+        let cx = 0, cy = 0, cnt = 0;
+        for (const w of walls) {
+          cx += w.start.x + w.end.x;
+          cy += w.start.y + w.end.y;
+          cnt += 2;
+        }
+        if (cnt > 0) {
+          cx /= cnt; cy /= cnt;
+          const toCentroid = { x: cx - wallMid.x, y: cy - wallMid.y };
+          const dot = toCentroid.x * wnx + toCentroid.y * wny;
+          insideNormX = dot >= 0 ? normX : -normX;
+          insideNormY = dot >= 0 ? normY : -normY;
+        }
+      }
+    }
+
+    const dirSign = measureMode === "inside" ? 1 : -1;
+    const wallThicknessPx = wallThick * pxPerCm;
+    const perpOffsetPx = dirSign * (wallThicknessPx / 2 + baseFontSize * 0.6 + 4);
+    let finalX = mx + insideNormX * perpOffsetPx;
+    let finalY = my + insideNormY * perpOffsetPx;
+
+    // Apply user-dragged offset
+    const userOffset = wallDimensionLabelOffsets[wallKey];
+    if (userOffset) {
+      finalX += userOffset.x * pxPerCm;
+      finalY += userOffset.y * pxPerCm;
+    }
+
+    return {
+      wallKey,
+      text,
+      centerX: finalX,
+      centerY: finalY,
+      halfW: textWidth / 2 + pad,
+      halfH: baseFontSize * 0.5 + pad,
+      angle,
+      anchorX: mx + insideNormX * perpOffsetPx,
+      anchorY: my + insideNormY * perpOffsetPx,
+      isDark,
+      zoom,
+    };
+  }
+
+  // Individual walls (not merged, no door/window occupants)
+  for (const wall of walls) {
+    if (mergedWallIds.has(wall.id)) continue;
+    const wallThick = wall.thickness || 15;
+    const occupants = getWallOccupants(wall.start, wall.end, wallThick, doorsWindows);
+    if (occupants.length > 0) continue;
+
+    const dx = wall.end.x - wall.start.x;
+    const dy = wall.end.y - wall.start.y;
+    const lengthCm = Math.sqrt(dx * dx + dy * dy);
+    const displayLengthCm = lengthCm;
+
+    const info = computeLabelInfo(wall.start, wall.end, wallThick, lengthCm, displayLengthCm, wall.id, wall);
+    if (info) results.push(info);
+  }
+
+  // Collinear groups
+  for (const [groupKey, group] of collinearGroups) {
+    const representativeWall = walls.find((w) => group.wallIds.has(w.id));
+    if (!representativeWall) continue;
+    const thickness = representativeWall.thickness ?? 15;
+
+    const groupOccupants = getWallOccupants(group.minP, group.maxP, thickness, doorsWindows);
+    if (groupOccupants.length > 0) continue;
+
+    const gdx = group.maxP.x - group.minP.x;
+    const gdy = group.maxP.y - group.minP.y;
+    const glen = Math.sqrt(gdx * gdx + gdy * gdy);
+
+    const info = computeLabelInfo(group.minP, group.maxP, thickness, glen, group.totalLengthCm, `group_${groupKey}`, representativeWall);
+    if (info) results.push(info);
+  }
+
+  return results;
+}
+
+/** Draw a single wall dimension label at the given screen position */
+function drawSingleWallDimensionLabel(
+  ctx: CanvasRenderingContext2D,
+  info: WallDimensionLabelInfo,
+  drawX: number,
+  drawY: number
+) {
+  const baseFontSize = Math.max(11, 12 * info.zoom);
+
+  ctx.save();
+  ctx.translate(drawX, drawY);
+  let textAngle = info.angle;
+  if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
+    textAngle += Math.PI;
+  }
+  ctx.rotate(textAngle);
+
+  ctx.font = `500 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+  ctx.fillStyle = info.isDark ? "#1c1b19" : "#f9f8f5";
+  ctx.fillRect(
+    -info.halfW,
+    -info.halfH,
+    info.halfW * 2,
+    info.halfH * 2
+  );
+  ctx.fillStyle = info.isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(info.text, 0, 0);
+
+  ctx.restore();
+}
+
+/** Hit test wall dimension labels — returns the wallKey of the hit label or null */
+export function hitTestWallDimensionLabel(
+  screenX: number,
+  screenY: number,
+  labelInfos: WallDimensionLabelInfo[]
+): string | null {
+  for (let i = labelInfos.length - 1; i >= 0; i--) {
+    const info = labelInfos[i];
+    // Transform screen point into the label's rotated local space
+    let textAngle = info.angle;
+    if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
+      textAngle += Math.PI;
+    }
+    const cos = Math.cos(-textAngle);
+    const sin = Math.sin(-textAngle);
+    const dx = screenX - info.centerX;
+    const dy = screenY - info.centerY;
+    const localX = dx * cos - dy * sin;
+    const localY = dx * sin + dy * cos;
+
+    if (Math.abs(localX) <= info.halfW + 4 && Math.abs(localY) <= info.halfH + 4) {
+      return info.wallKey;
+    }
+  }
+  return null;
 }
 
 export function drawFurniture(
@@ -4548,7 +4756,7 @@ interface LabelRect {
   y: number; // center y (screen px)
   w: number; // half-width
   h: number; // half-height
-  priority: number; // 0 = highest (room), 1 = wall, 2 = component, 3 = freeform
+  priority: number; // 0 = room, 1 = distance, 1.5 = wall dimension, 2 = component, 3 = freeform
   anchorX: number; // original anchor point
   anchorY: number;
   sourceIndex: number; // index into source array (-1 for room/wall labels)
@@ -4576,11 +4784,32 @@ export function resolveAndDrawLabelCollisions(
   componentLabelsVisible: boolean,
   selectedId: string | null,
   labelPositions: Map<string, Point> = new Map(),
-  distanceMeasurementRects: DistanceMeasurementLabelInfo[] = []
+  distanceMeasurementRects: DistanceMeasurementLabelInfo[] = [],
+  wallDimensionLabelInfos: WallDimensionLabelInfo[] = [],
+  furniture: FurnitureItem[] = []
 ): void {
   // Collect all label rects with priority
   const allRects: LabelRect[] = [];
   const pxPerCm = (gridSize * zoom) / 100;
+
+  // Build furniture AABB list (screen space) for nudging wall dimension labels away from furniture
+  const furnitureAABBs: { x: number; y: number; w: number; h: number }[] = [];
+  for (const item of furniture) {
+    if (item.type === "door" || item.type === "door_double" || item.type === "window" || item.type === "bay_window") continue;
+    const ix = item.x * pxPerCm + panOffset.x;
+    const iy = item.y * pxPerCm + panOffset.y;
+    const iw = item.width * pxPerCm;
+    const ih = item.height * pxPerCm;
+    // For rotated items, use the bounding circle as AABB
+    if (item.rotation % 360 !== 0) {
+      const cx = ix + iw / 2;
+      const cy = iy + ih / 2;
+      const radius = Math.sqrt(iw * iw + ih * ih) / 2;
+      furnitureAABBs.push({ x: cx, y: cy, w: radius, h: radius });
+    } else {
+      furnitureAABBs.push({ x: ix + iw / 2, y: iy + ih / 2, w: iw / 2, h: ih / 2 });
+    }
+  }
 
   // Room labels (priority 0) — immovable anchors, already drawn by drawRoomAreas
   for (const room of rooms) {
@@ -4605,6 +4834,33 @@ export function resolveAndDrawLabelCollisions(
     allRects.push({
       x: dm.centerX, y: dm.centerY, w: dm.halfW, h: dm.halfH,
       priority: 1, anchorX: dm.centerX, anchorY: dm.centerY, sourceIndex: -1,
+    });
+  }
+
+  // Wall dimension labels (priority 1.5) — nudgeable, drawn here
+  for (let i = 0; i < wallDimensionLabelInfos.length; i++) {
+    const info = wallDimensionLabelInfos[i];
+    let lx = info.centerX;
+    let ly = info.centerY;
+
+    // Nudge wall dimension label away from furniture AABBs
+    for (const furn of furnitureAABBs) {
+      const overlapX = furn.w + info.halfW + 4 - Math.abs(lx - furn.x);
+      const overlapY = furn.h + info.halfH + 4 - Math.abs(ly - furn.y);
+      if (overlapX > 0 && overlapY > 0) {
+        // Nudge in the direction of least overlap
+        if (overlapX < overlapY) {
+          ly += (ly >= furn.y ? 1 : -1) * overlapY;
+        } else {
+          lx += (lx >= furn.x ? 1 : -1) * overlapX;
+        }
+      }
+    }
+
+    allRects.push({
+      x: lx, y: ly, w: info.halfW, h: info.halfH,
+      priority: 1.5, anchorX: info.anchorX, anchorY: info.anchorY,
+      sourceIndex: i,
     });
   }
 
@@ -4678,6 +4934,14 @@ export function resolveAndDrawLabelCollisions(
 
   ctx.setLineDash([]);
   ctx.restore();
+
+  // Draw wall dimension labels at their resolved (possibly nudged) positions
+  for (const { rect } of nudgedLabels) {
+    if (rect.priority === 1.5 && rect.sourceIndex >= 0) {
+      const info = wallDimensionLabelInfos[rect.sourceIndex];
+      drawSingleWallDimensionLabel(ctx, info, rect.x, rect.y);
+    }
+  }
 
   // Draw component labels at their resolved (possibly nudged) positions
   if (componentLabelsVisible) {

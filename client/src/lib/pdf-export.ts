@@ -5,7 +5,10 @@ import {
   drawWalls,
   drawFurniture,
   drawLabels,
+  collectWallDimensionLabelRects,
+  resolveAndDrawLabelCollisions,
 } from "./canvas-renderer";
+import { detectRooms } from "./room-detection";
 
 export async function exportToPdf(state: EditorState, roomName: string) {
   // Create an offscreen canvas at high resolution
@@ -76,6 +79,20 @@ export async function exportToPdf(state: EditorState, roomName: string) {
 
   // Draw furniture
   drawFurniture(ctx, state.furniture, gridSize, zoom, panOffset, false, null);
+
+  // Draw wall dimension labels (above furniture)
+  const rooms = detectRooms(state.walls);
+  const wallDimLabels = collectWallDimensionLabelRects(
+    ctx, state.walls, gridSize, zoom, panOffset, false,
+    state.units, "inside", state.furniture, rooms, state.wallDimensionLabelOffsets
+  );
+  // Draw them via the collision system (with empty component labels and freeform labels handled separately)
+  resolveAndDrawLabelCollisions(
+    ctx, rooms, state.walls, [], [],
+    gridSize, zoom, panOffset, false,
+    state.roomNames || {}, false, null,
+    new Map(), [], wallDimLabels, state.furniture
+  );
 
   // Draw labels
   drawLabels(ctx, state.labels, gridSize, zoom, panOffset, false, null);
