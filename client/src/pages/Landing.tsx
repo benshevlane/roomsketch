@@ -82,7 +82,7 @@ const faqs = [
 export default function Landing() {
   useDocumentMeta({
     title: "Free Room Planner — Draw Your Floor Plan, No Sign-Up",
-    description: "Draw an accurate floor plan in minutes. Snap-to-grid walls, 30+ furniture items, live measurements. Free, forever. No email or download required.",
+    description: "A free browser-based room planner for homeowners. Draw accurate floor plans, place furniture to scale, and export a PNG to share with your designer or fitter.",
   });
   const [, navigate] = useLocation();
   const [openFaq, setOpenFaq] = useState<number | null>(0);

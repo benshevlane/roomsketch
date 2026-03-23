@@ -29,8 +29,8 @@ import {
 
 export default function Editor() {
   useDocumentMeta({
-    title: "Room Editor — Free Room Planner",
-    description: "Draw walls, place furniture, and export your floor plan as PNG. Free online room planning tool — no account required.",
+    title: "Open the Room Planner — Free Room Planner",
+    description: "Launch the free browser-based room planner. Draw your floor plan, add furniture, and export — no sign-up required.",
   });
   const isMobile = useIsMobile();
   const [showIntentCapture, setShowIntentCapture] = useState(() => {
