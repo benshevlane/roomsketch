@@ -298,9 +298,9 @@ function buildPreviewSrc(partnerId: string, form: FormState): string {
 
 export default function GetEmbed() {
   useDocumentMeta({
-    title: "Add a Free Room Planner to Your Website | Free Room Planner",
+    title: "Embed the Room Planner on Your Website — Free Room Planner",
     description:
-      "Give your customers a free drag-and-drop room planner. One line of code, no sign-up required.",
+      "Add a free room planning tool to your website. Let your customers draw their room before they visit your showroom or request a quote.",
   });
 
   const [, navigate] = useLocation();
