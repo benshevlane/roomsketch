@@ -347,8 +347,69 @@ export default function FloorPlanCanvas({
     const doorWindowItems = state.furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window" || f.type === "bay_window");
     drawFurniture(ctx, doorWindowItems, state.gridSize, state.zoom, state.panOffset, isDark, state.selectedItemId);
 
+    // Compute obstacle rects for wall measurement label avoidance (panels + selected item)
+    const wallLabelObstacles: { left: number; top: number; right: number; bottom: number }[] = [];
+    {
+      // Detect sidebar panels that may overlay or abut the canvas
+      const canvasEl = canvasRef.current;
+      if (canvasEl) {
+        const canvasRect = canvasEl.getBoundingClientRect();
+        // Check for panels on each side using data-testid or known selectors
+        const panelSelectors = [
+          '[data-testid="furniture-panel"]',
+          '.properties-panel',
+          // Also check sibling elements that may overlap the canvas area
+        ];
+        for (const sel of panelSelectors) {
+          const panelEl = document.querySelector(sel);
+          if (panelEl) {
+            const pr = panelEl.getBoundingClientRect();
+            // Convert panel rect to canvas-local coordinates
+            wallLabelObstacles.push({
+              left: pr.left - canvasRect.left,
+              top: pr.top - canvasRect.top,
+              right: pr.right - canvasRect.left,
+              bottom: pr.bottom - canvasRect.top,
+            });
+          }
+        }
+        // Also add right/left edge margins when the canvas is flush against a panel
+        // to prevent labels from being clipped at canvas boundaries
+        const edgeMargin = 10;
+        // Right edge (PropertiesPanel side)
+        wallLabelObstacles.push({
+          left: canvasRect.width - edgeMargin,
+          top: 0,
+          right: canvasRect.width + 100,
+          bottom: canvasRect.height,
+        });
+        // Left edge (FurniturePanel side)
+        wallLabelObstacles.push({
+          left: -100,
+          top: 0,
+          right: edgeMargin,
+          bottom: canvasRect.height,
+        });
+      }
+      // Add selected/dragged furniture bounding box as an obstacle
+      const selectedFurnForObstacle = state.furniture.find((f) => f.id === state.selectedItemId);
+      if (selectedFurnForObstacle && isDragging) {
+        const pxPerCm = (state.gridSize * state.zoom) / 100;
+        const fx = selectedFurnForObstacle.x * pxPerCm + state.panOffset.x;
+        const fy = selectedFurnForObstacle.y * pxPerCm + state.panOffset.y;
+        const fw = selectedFurnForObstacle.width * pxPerCm;
+        const fh = selectedFurnForObstacle.height * pxPerCm;
+        wallLabelObstacles.push({
+          left: fx - 5,
+          top: fy - 5,
+          right: fx + fw + 5,
+          bottom: fy + fh + 5,
+        });
+      }
+    }
+
     // Segment measurements for walls with doors/windows (drawn after furniture so worktops don't obscure them)
-    drawWallSegmentMeasurements(ctx, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode, rooms);
+    drawWallSegmentMeasurements(ctx, state.walls, state.furniture, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode, rooms, wallLabelObstacles);
 
     // Wall snap indicator lines (during drag)
     if (isDragging && wallSnapEdges.length > 0) {

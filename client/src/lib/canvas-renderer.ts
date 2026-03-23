@@ -644,7 +644,8 @@ function drawTotalWallDimensionLine(
   occupants: { along: number; halfExtent: number }[] = [],
   startExtension: number = 0,
   endExtension: number = 0,
-  normalSign: number = 1
+  normalSign: number = 1,
+  obstacleRects: { left: number; top: number; right: number; bottom: number }[] = []
 ) {
   const sx = wallStart.x * pxPerCm + panOffset.x;
   const sy = wallStart.y * pxPerCm + panOffset.y;
@@ -722,8 +723,73 @@ function drawTotalWallDimensionLine(
       }
     }
 
-    const mx = osx + (oex - osx) * labelFrac;
-    const my = osy + (oey - osy) * labelFrac;
+    let mx = osx + (oex - osx) * labelFrac;
+    let my = osy + (oey - osy) * labelFrac;
+
+    // Nudge label away from obstacle rects (panels, dragged items)
+    if (obstacleRects.length > 0) {
+      const labelHalfW = textW / 2 + pad;
+      const labelHalfH = baseFontSize / 2 + pad;
+      for (const obs of obstacleRects) {
+        // Check overlap between label AABB and obstacle rect
+        if (
+          mx + labelHalfW > obs.left && mx - labelHalfW < obs.right &&
+          my + labelHalfH > obs.top && my - labelHalfH < obs.bottom
+        ) {
+          // Compute how far to shift along the wall to clear the obstacle
+          // Try shifting labelFrac in both directions and pick the smaller shift
+          const wallDirPx = { x: oex - osx, y: oey - osy };
+          const wallLenPx = Math.sqrt(wallDirPx.x ** 2 + wallDirPx.y ** 2);
+          if (wallLenPx > 0) {
+            // Try shifting toward lower frac (start of wall)
+            let bestFrac = labelFrac;
+            let bestShift = Infinity;
+            for (const dir of [-1, 1]) {
+              // Binary-search for minimum shift that clears the obstacle
+              let lo = 0;
+              let hi = dir === -1 ? labelFrac - 0.05 : 1.0 - labelFrac - 0.05;
+              if (hi < 0) continue;
+              const tryFrac = labelFrac + dir * hi;
+              const tryX = osx + (oex - osx) * tryFrac;
+              const tryY = osy + (oey - osy) * tryFrac;
+              // Check if shifted position clears the obstacle
+              if (
+                tryX + labelHalfW <= obs.left || tryX - labelHalfW >= obs.right ||
+                tryY + labelHalfH <= obs.top || tryY - labelHalfH >= obs.bottom
+              ) {
+                // Find the minimum shift via binary search
+                lo = 0;
+                let hiVal = hi;
+                for (let i = 0; i < 10; i++) {
+                  const mid = (lo + hiVal) / 2;
+                  const mFrac = labelFrac + dir * mid;
+                  const mX = osx + (oex - osx) * mFrac;
+                  const mY = osy + (oey - osy) * mFrac;
+                  const overlaps =
+                    mX + labelHalfW > obs.left && mX - labelHalfW < obs.right &&
+                    mY + labelHalfH > obs.top && mY - labelHalfH < obs.bottom;
+                  if (overlaps) {
+                    lo = mid;
+                  } else {
+                    hiVal = mid;
+                  }
+                }
+                const shift = (lo + hiVal) / 2;
+                if (shift < bestShift) {
+                  bestShift = shift;
+                  bestFrac = labelFrac + dir * ((lo + hiVal) / 2 + 0.02);
+                }
+              }
+            }
+            if (bestShift < Infinity) {
+              labelFrac = Math.max(0.05, Math.min(0.95, bestFrac));
+              mx = osx + (oex - osx) * labelFrac;
+              my = osy + (oey - osy) * labelFrac;
+            }
+          }
+        }
+      }
+    }
 
     ctx.save();
     ctx.translate(mx, my);
@@ -758,7 +824,8 @@ export function drawWallSegmentMeasurements(
   isDark: boolean,
   units: UnitSystem = "m",
   measureMode: MeasureMode = "inside",
-  rooms: DetectedRoom[] = []
+  rooms: DetectedRoom[] = [],
+  obstacleRects: { left: number; top: number; right: number; bottom: number }[] = []
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
   const color = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
@@ -843,8 +910,40 @@ export function drawWallSegmentMeasurements(
 
     // Only draw if text fits reasonably
     if (textW + pad * 2 < segLenPx + 10) {
-      const mx = (osx + oex) / 2;
-      const my = (osy + oey) / 2;
+      let mx = (osx + oex) / 2;
+      let my = (osy + oey) / 2;
+
+      // Nudge segment label away from obstacle rects (panels, dragged items)
+      if (obstacleRects.length > 0) {
+        const labelHalfW = textW / 2 + pad;
+        const labelHalfH = baseFontSize / 2 + pad;
+        for (const obs of obstacleRects) {
+          if (
+            mx + labelHalfW > obs.left && mx - labelHalfW < obs.right &&
+            my + labelHalfH > obs.top && my - labelHalfH < obs.bottom
+          ) {
+            // Shift along wall toward whichever end clears the obstacle faster
+            const wallLenPx = Math.sqrt((oex - osx) ** 2 + (oey - osy) ** 2);
+            if (wallLenPx > 0) {
+              const curFrac = 0.5;
+              for (const dir of [-1, 1]) {
+                const tryFrac = curFrac + dir * 0.35;
+                if (tryFrac < 0.05 || tryFrac > 0.95) continue;
+                const tryX = osx + (oex - osx) * tryFrac;
+                const tryY = osy + (oey - osy) * tryFrac;
+                if (
+                  tryX + labelHalfW <= obs.left || tryX - labelHalfW >= obs.right ||
+                  tryY + labelHalfH <= obs.top || tryY - labelHalfH >= obs.bottom
+                ) {
+                  mx = tryX;
+                  my = tryY;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
 
       ctx.save();
       ctx.translate(mx, my);
@@ -1005,7 +1104,7 @@ export function drawWallSegmentMeasurements(
     drawTotalWallDimensionLine(
       ctx, wallStart, wallEnd, displayLengthCm, wallThick,
       pxPerCm, panOffset, zoom, isDark, units, color, measureMode,
-      allOccupants, segStartExt, segEndExt, normalSign
+      allOccupants, segStartExt, segEndExt, normalSign, obstacleRects
     );
   }
 }
@@ -3135,23 +3234,29 @@ function computeEdgeToWallDistances(
         const midX = Math.max(bb.left, wallMinX) + (Math.min(bb.right, wallMaxX) - Math.max(bb.left, wallMinX)) / 2;
         // Top edge to wall
         const distTop = Math.abs(bb.top - wallY) - halfThick;
-        if (distTop > 0 && distTop < 300) {
-          results.push({
-            dist: distTop,
-            furnitureEdgePt: { x: midX, y: bb.top },
-            wallPt: { x: midX, y: bb.top > wallY ? wallY + halfThick : wallY - halfThick },
-            axis: "v",
-          });
-        }
         // Bottom edge to wall
         const distBottom = Math.abs(bb.bottom - wallY) - halfThick;
-        if (distBottom > 0 && distBottom < 300) {
-          results.push({
-            dist: distBottom,
-            furnitureEdgePt: { x: midX, y: bb.bottom },
-            wallPt: { x: midX, y: bb.bottom > wallY ? wallY + halfThick : wallY - halfThick },
-            axis: "v",
-          });
+
+        // Only push the closer edge to this wall; if it's ≤ 2cm (flush/snapped), suppress entirely
+        const minThreshold = 2; // cm – suppress distance indicator when essentially touching
+        if (distTop <= distBottom) {
+          if (distTop > minThreshold && distTop < 300) {
+            results.push({
+              dist: distTop,
+              furnitureEdgePt: { x: midX, y: bb.top },
+              wallPt: { x: midX, y: bb.top > wallY ? wallY + halfThick : wallY - halfThick },
+              axis: "v",
+            });
+          }
+        } else {
+          if (distBottom > minThreshold && distBottom < 300) {
+            results.push({
+              dist: distBottom,
+              furnitureEdgePt: { x: midX, y: bb.bottom },
+              wallPt: { x: midX, y: bb.bottom > wallY ? wallY + halfThick : wallY - halfThick },
+              axis: "v",
+            });
+          }
         }
       }
     }
@@ -3168,23 +3273,29 @@ function computeEdgeToWallDistances(
         const midY = Math.max(bb.top, wallMinY) + (Math.min(bb.bottom, wallMaxY) - Math.max(bb.top, wallMinY)) / 2;
         // Left edge to wall
         const distLeft = Math.abs(bb.left - wallX) - halfThick;
-        if (distLeft > 0 && distLeft < 300) {
-          results.push({
-            dist: distLeft,
-            furnitureEdgePt: { x: bb.left, y: midY },
-            wallPt: { x: bb.left > wallX ? wallX + halfThick : wallX - halfThick, y: midY },
-            axis: "h",
-          });
-        }
         // Right edge to wall
         const distRight = Math.abs(bb.right - wallX) - halfThick;
-        if (distRight > 0 && distRight < 300) {
-          results.push({
-            dist: distRight,
-            furnitureEdgePt: { x: bb.right, y: midY },
-            wallPt: { x: bb.right > wallX ? wallX + halfThick : wallX - halfThick, y: midY },
-            axis: "h",
-          });
+
+        // Only push the closer edge to this wall; if it's ≤ 2cm (flush/snapped), suppress entirely
+        const minThreshold = 2; // cm – suppress distance indicator when essentially touching
+        if (distLeft <= distRight) {
+          if (distLeft > minThreshold && distLeft < 300) {
+            results.push({
+              dist: distLeft,
+              furnitureEdgePt: { x: bb.left, y: midY },
+              wallPt: { x: bb.left > wallX ? wallX + halfThick : wallX - halfThick, y: midY },
+              axis: "h",
+            });
+          }
+        } else {
+          if (distRight > minThreshold && distRight < 300) {
+            results.push({
+              dist: distRight,
+              furnitureEdgePt: { x: bb.right, y: midY },
+              wallPt: { x: bb.right > wallX ? wallX + halfThick : wallX - halfThick, y: midY },
+              axis: "h",
+            });
+          }
         }
       }
     }
