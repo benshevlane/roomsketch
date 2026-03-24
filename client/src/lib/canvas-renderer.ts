@@ -2253,18 +2253,43 @@ function drawFurnitureDetail(
       break;
     }
     case "p_shape_bath": {
-      // P-shape: rectangular left portion + rounded right end
-      // Dashed divider at ~58% width
+      // P-shape outline: straight left + top, curved right bulge, straight bottom
+      const bulgeStartX = -w / 2 + w * 0.58;
+      // Outer P-shape path
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, -h / 2);
+      ctx.lineTo(bulgeStartX, -h / 2);
+      ctx.quadraticCurveTo(w / 2, -h / 2, w / 2, 0);
+      ctx.quadraticCurveTo(w / 2, h / 2, bulgeStartX, h / 2);
+      ctx.lineTo(-w / 2, h / 2);
+      ctx.closePath();
+      ctx.fillStyle = stroke;
+      ctx.globalAlpha = 0.06;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.stroke();
+      // Inner rim (inset P-shape)
+      const pInset = Math.min(w, h) * 0.08;
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2 + pInset, -h / 2 + pInset);
+      ctx.lineTo(bulgeStartX, -h / 2 + pInset);
+      ctx.quadraticCurveTo(w / 2 - pInset, -h / 2 + pInset, w / 2 - pInset, 0);
+      ctx.quadraticCurveTo(w / 2 - pInset, h / 2 - pInset, bulgeStartX, h / 2 - pInset);
+      ctx.lineTo(-w / 2 + pInset, h / 2 - pInset);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Dashed divider between bath & shower zones
       ctx.globalAlpha = 0.4;
       ctx.setLineDash([4, 3]);
-      const divX = -w / 2 + w * 0.58;
       ctx.beginPath();
-      ctx.moveTo(divX, -h / 2);
-      ctx.lineTo(divX, h / 2);
+      ctx.moveTo(bulgeStartX, -h / 2);
+      ctx.lineTo(bulgeStartX, h / 2);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
-      // Basin ellipse in left section
+      // Basin ellipse in left (bath) section
       const bCx = -w / 2 + w * 0.3;
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.08;
@@ -2275,25 +2300,37 @@ function drawFurnitureDetail(
       ctx.beginPath();
       ctx.ellipse(bCx, 0, w * 0.21, h * 0.32, 0, 0, Math.PI * 2);
       ctx.stroke();
-      // Taps on left edge
+      // Tap knobs (two circles on left edge)
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.3;
-      ctx.fillRect(-w * 0.46, -h * 0.08, w * 0.065, h * 0.16);
+      const pTapX = -w / 2 + w * 0.1;
+      ctx.beginPath();
+      ctx.arc(pTapX, -h * 0.06, w * 0.016, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(pTapX, h * 0.06, w * 0.016, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
       ctx.globalAlpha = 1;
-      ctx.strokeRect(-w * 0.46, -h * 0.08, w * 0.065, h * 0.16);
-      // Shower head circle in right section
+      // Shower head in right (bulge) section — two concentric circles
       const shCx = -w / 2 + w * 0.77;
       const shCy = -h * 0.24;
+      const pShR = w * 0.084;
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.08;
       ctx.beginPath();
-      ctx.arc(shCx, shCy, w * 0.084, 0, Math.PI * 2);
+      ctx.arc(shCx, shCy, pShR, 0, Math.PI * 2);
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.beginPath();
-      ctx.arc(shCx, shCy, w * 0.084, 0, Math.PI * 2);
+      ctx.arc(shCx, shCy, pShR, 0, Math.PI * 2);
       ctx.stroke();
-      // Spray dots around shower head
+      // Inner head circle
+      ctx.beginPath();
+      ctx.arc(shCx, shCy, pShR * 0.38, 0, Math.PI * 2);
+      ctx.stroke();
+      // Spray dots
       ctx.fillStyle = stroke;
       ctx.globalAlpha = 0.5;
       for (const [dx, dy] of [[-0.04, -0.04], [0, -0.05], [0.04, -0.04], [-0.045, 0], [0.045, 0]]) {
