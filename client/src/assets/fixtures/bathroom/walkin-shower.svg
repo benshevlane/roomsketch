@@ -1,0 +1,19 @@
+<svg width="130" height="100" viewBox="0 0 130 100" xmlns="http://www.w3.org/2000/svg">
+  <line x1="2" y1="2" x2="128" y2="2" stroke="#c8c3ba" stroke-width="2"/>
+  <line x1="2" y1="2" x2="2" y2="98" stroke="#c8c3ba" stroke-width="2"/>
+  <line x1="128" y1="2" x2="128" y2="98" stroke="#c8c3ba" stroke-width="2"/>
+  <line x1="2" y1="98" x2="128" y2="98" stroke="#b8b3aa" stroke-width="1" stroke-dasharray="6 3"/>
+  <rect x="6" y="6" width="118" height="88" fill="#e8e4de"/>
+  <circle cx="104" cy="24" r="16" fill="#e0dcd6" stroke="#b8b3aa" stroke-width="1"/>
+  <circle cx="104" cy="24" r="7" fill="#d0ccc5" stroke="#b8b3aa" stroke-width="0.8"/>
+  <circle cx="97" cy="18" r="1.5" fill="#b8b3aa"/>
+  <circle cx="104" cy="16" r="1.5" fill="#b8b3aa"/>
+  <circle cx="111" cy="18" r="1.5" fill="#b8b3aa"/>
+  <circle cx="95" cy="24" r="1.5" fill="#b8b3aa"/>
+  <circle cx="113" cy="24" r="1.5" fill="#b8b3aa"/>
+  <circle cx="97" cy="30" r="1.5" fill="#b8b3aa"/>
+  <circle cx="111" cy="30" r="1.5" fill="#b8b3aa"/>
+  <circle cx="26" cy="76" r="6" fill="#d0ccc5" stroke="#b8b3aa" stroke-width="0.8"/>
+  <line x1="22" y1="76" x2="30" y2="76" stroke="#b8b3aa" stroke-width="0.8"/>
+  <line x1="26" y1="72" x2="26" y2="80" stroke="#b8b3aa" stroke-width="0.8"/>
+</svg>
