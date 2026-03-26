@@ -165,6 +165,7 @@ export default function Landing() {
             <a href="#features" onClick={scrollTo("features")} className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>Features</a>
             <a href="#faq" onClick={scrollTo("faq")} className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>FAQ</a>
             <a href="/get-embed" onClick={(e) => { e.preventDefault(); navigate("/get-embed"); }} className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>For businesses</a>
+            <a href="/blog" className={`${isDark ? "text-[#a09a8c] hover:text-[#f0ede6]" : "text-[#6b6457] hover:text-[#1a1a18]"} transition-colors`}>Blog</a>
           </nav>
           <div className="flex items-center gap-3">
             <button
@@ -534,6 +535,7 @@ export default function Landing() {
               <span>Free Room Planner</span>
             </div>
             <a href="/get-embed" onClick={(e) => { e.preventDefault(); navigate("/get-embed"); }} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>For businesses</a>
+            <a href="/blog" className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Blog</a>
             <button onClick={() => setContactOpen(true)} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Contact us</button>
             <button onClick={() => setFeedbackOpen(true)} className={`${isDark ? "text-[#5a5a52] hover:text-[#a09a8c]" : "text-[#9a9488] hover:text-[#6b6457]"} transition-colors`}>Feedback</button>
           </div>
