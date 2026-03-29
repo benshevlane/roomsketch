@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Free Room Planner — Coaster Design</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'General Sans', 'DM Sans', sans-serif;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .coaster {
+      width: 384px;
+      height: 384px;
+      background: #faf8f4;
+      border: 1.5px solid #3d8a7c;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+    }
+
+    .logo {
+      width: 96px;
+      height: 96px;
+      object-fit: contain;
+      margin-bottom: 20px;
+    }
+
+    .url {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1a1a18;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+    }
+
+    .tagline {
+      font-size: 13px;
+      font-weight: 500;
+      color: #6b6457;
+      letter-spacing: -0.01em;
+      margin-top: 6px;
+    }
+
+    /* Print styles */
+    @media print {
+      @page {
+        size: 4in 4in;
+        margin: 0;
+      }
+
+      body {
+        background: none;
+        min-height: auto;
+      }
+
+      .coaster {
+        width: 4in;
+        height: 4in;
+        border-radius: 16px;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="coaster">
+    <img src="logo.png" alt="Free Room Planner" class="logo">
+    <div class="url">freeroomplanner.com</div>
+    <div class="tagline">plan your room, share your plan</div>
+  </div>
+</body>
+</html>
