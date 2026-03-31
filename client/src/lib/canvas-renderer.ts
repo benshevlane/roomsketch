@@ -748,7 +748,12 @@ function drawTotalWallDimensionLine(
   ctx.stroke();
 
   // Label
-  const text = formatLength(displayLengthCm, units);
+  let text = formatLength(displayLengthCm, units);
+  if (measureMode === "full") {
+    text += " (outside wall)";
+  } else {
+    text += " (inside wall)";
+  }
   const baseFontSize = Math.max(10, 11 * zoom);
   ctx.font = `600 ${baseFontSize}px 'General Sans', 'DM Sans', sans-serif`;
   const textW = ctx.measureText(text).width;
@@ -880,7 +885,6 @@ export function drawWallSegmentMeasurements(
   const pxPerCm = (gridSize * zoom) / 100;
   const color = isDark ? DIMENSION_COLOR_DARK : DIMENSION_COLOR_LIGHT;
   const doorsWindows = furniture.filter((f) => f.type === "door" || f.type === "door_double" || f.type === "window");
-  if (doorsWindows.length === 0) return;
 
   // Non-door/window furniture (worktops, etc.) used as label-positioning obstacles for total dimension line
   const otherFurniture = furniture.filter((f) => f.type !== "door" && f.type !== "door_double" && f.type !== "window" && f.type !== "bay_window");
@@ -1100,10 +1104,64 @@ export function drawWallSegmentMeasurements(
     let normalSign = insideDot >= 0 ? 1 : -1;
     if (measureMode === "full") normalSign = -normalSign;
 
+    // Compute extensions and half thickness (needed for both paths below)
+    const halfThick = wallThick / 2;
+    const { startExtension: segStartExt, endExtension: segEndExt } = measureMode === "full"
+      ? getEndpointExtensions(wallStart, wallEnd, wallThick, walls)
+      : { startExtension: 0, endExtension: 0 };
+
     // Find doors/windows on this effective wall
     const occupants = getWallOccupants(wallStart, wallEnd, wallThick, doorsWindows);
 
-    if (occupants.length === 0) continue;
+    if (occupants.length === 0) {
+      // No doors/windows — draw a single full-width dimension line (no label;
+      // the label is already rendered by drawWallDimensionLabel in drawWalls)
+      const sx = wallStart.x * pxPerCm + panOffset.x;
+      const sy = wallStart.y * pxPerCm + panOffset.y;
+      const ex = wallEnd.x * pxPerCm + panOffset.x;
+      const ey = wallEnd.y * pxPerCm + panOffset.y;
+      const angle = Math.atan2(ey - sy, ex - sx);
+      const wallThickPx = wallThick * pxPerCm;
+      const dirX = Math.cos(angle);
+      const dirY = Math.sin(angle);
+
+      const startInset = measureMode === "inside" ? halfThick * pxPerCm : -segStartExt * pxPerCm;
+      const endInset = measureMode === "inside" ? halfThick * pxPerCm : -segEndExt * pxPerCm;
+      const isx = sx + dirX * startInset;
+      const isy = sy + dirY * startInset;
+      const iex = ex - dirX * endInset;
+      const iey = ey - dirY * endInset;
+
+      // Offset to outside of wall (same side as total dimension line for walls with openings)
+      const offsetDist = -normalSign * (wallThickPx / 2 + 8 * zoom);
+      const normX = -Math.sin(angle);
+      const normY = Math.cos(angle);
+      const osx = isx + normX * offsetDist;
+      const osy = isy + normY * offsetDist;
+      const oex = iex + normX * offsetDist;
+      const oey = iey + normY * offsetDist;
+
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(osx, osy);
+      ctx.lineTo(oex, oey);
+      ctx.stroke();
+
+      // End ticks perpendicular to line
+      const tickLen = 4;
+      ctx.beginPath();
+      ctx.moveTo(osx - normX * tickLen, osy - normY * tickLen);
+      ctx.lineTo(osx + normX * tickLen, osy + normY * tickLen);
+      ctx.moveTo(oex - normX * tickLen, oey - normY * tickLen);
+      ctx.lineTo(oex + normX * tickLen, oey + normY * tickLen);
+      ctx.stroke();
+      ctx.restore();
+
+      continue;
+    }
 
     // Sort occupants by position along wall
     occupants.sort((a, b) => a.along - b.along);
@@ -1112,10 +1170,6 @@ export function drawWallSegmentMeasurements(
     // so that other items on the same wall don't interrupt the measurement lines.
     // In inside mode, inset segment boundaries by half wall thickness at each wall end.
     // In full mode, extend at connected endpoints to match junction circle extent.
-    const halfThick = wallThick / 2;
-    const { startExtension: segStartExt, endExtension: segEndExt } = measureMode === "full"
-      ? getEndpointExtensions(wallStart, wallEnd, wallThick, walls)
-      : { startExtension: 0, endExtension: 0 };
     const wallStartAlong = measureMode === "inside" ? halfThick : -segStartExt;
     const wallEndAlong = measureMode === "inside" ? wallLen - halfThick : wallLen + segEndExt;
     const segments: { startAlong: number; endAlong: number }[] = [];
@@ -1611,6 +1665,8 @@ function computeWallLabelPosition(
   // Add measurement mode suffix
   if (measureMode === "full") {
     text += " (outside wall)";
+  } else {
+    text += " (inside wall)";
   }
 
   // Measure text width — use ctx if available, else estimate
