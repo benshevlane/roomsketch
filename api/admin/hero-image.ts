@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { isAdmin } from "./_auth";
-import { supabaseAdmin } from "./_supabase";
+import { isAdmin } from "./_auth.js";
+import { supabaseAdmin } from "./_supabase.js";
 
 const BUCKET = "hero-images";
 const OBJECT_PATH = "hero-floorplan.jpg";

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { setAuthCookie } from "./_auth";
-import { supabaseAdmin } from "./_supabase";
-import { verifyPassword } from "./_passwords";
+import { setAuthCookie } from "./_auth.js";
+import { supabaseAdmin } from "./_supabase.js";
+import { verifyPassword } from "./_passwords.js";
 
 // In-memory rate limiting (per serverless instance)
 const loginAttempts = new Map<string, { count: number; firstAttempt: number }>();
