@@ -421,6 +421,85 @@ function EmbedReport() {
   );
 }
 
+function SeoSettings() {
+  const { data, isLoading, error } = useQuery<{ settings: Record<string, string> }>({
+    queryKey: ["/api/admin/seo-settings"],
+  });
+
+  const [minDR, setMinDR] = useState("10");
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (data?.settings?.min_domain_rating && !initialized) {
+      setMinDR(data.settings.min_domain_rating);
+      setInitialized(true);
+    }
+  }, [data, initialized]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setFeedback(null);
+    try {
+      await apiRequest("PUT", "/api/admin/seo-settings", {
+        settings: { min_domain_rating: minDR },
+      });
+      setFeedback({ type: "success", message: "SEO settings saved." });
+    } catch {
+      setFeedback({ type: "error", message: "Failed to save settings." });
+    }
+    setSaving(false);
+  };
+
+  if (isLoading) return <p className="text-sm text-[#9a9488] mt-12">Loading SEO settings...</p>;
+  if (error) return <p className="text-sm text-red-600 mt-12">Failed to load SEO settings.</p>;
+
+  return (
+    <div className="mt-12">
+      <h2 className="text-lg font-semibold mb-1">SEO Settings</h2>
+      <p className="text-sm text-[#6b6457] mb-4">
+        Configure parameters for the SEO backlink discovery agent.
+      </p>
+      <div className="rounded-xl border border-[#e8e3d8] bg-white shadow-sm p-6">
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="min-dr" className="block text-sm font-medium text-[#6b6457] mb-1">
+              Minimum Domain Rating (DR)
+            </label>
+            <input
+              id="min-dr"
+              type="number"
+              min="0"
+              max="100"
+              value={minDR}
+              onChange={(e) => setMinDR(e.target.value)}
+              className="w-32 border border-[#d8d2c4] rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#3d8a7c] transition-colors"
+            />
+            <p className="text-xs text-[#9a9488] mt-1">
+              Sites below this DR will be filtered out. Recommended: 10–50.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-[#3d8a7c] text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-[#357a6e] disabled:opacity-50 transition-colors"
+            >
+              {saving ? "Saving..." : "Save settings"}
+            </button>
+            {feedback && (
+              <span className={`text-sm font-medium ${feedback.type === "error" ? "text-red-600" : "text-[#3d8a7c]"}`}>
+                {feedback.message}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [adminEmail, setAdminEmail] = useState<string | null>(null);
@@ -664,6 +743,9 @@ export default function Admin() {
 
         {/* Embed Users Report */}
         <EmbedReport />
+
+        {/* SEO Agent Settings */}
+        <SeoSettings />
       </div>
     </div>
   );

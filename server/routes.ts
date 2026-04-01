@@ -401,6 +401,82 @@ export async function registerRoutes(
     res.json({ ok: true });
   });
 
+  // Admin: get SEO settings
+  app.get("/api/admin/seo-settings", requireAdmin, async (_req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase not configured" });
+    }
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("seo_settings")
+        .select("key, value, updated_at");
+      if (error) throw error;
+
+      const settings: Record<string, string> = {};
+      for (const row of data ?? []) {
+        settings[row.key] = row.value;
+      }
+      return res.json({ settings });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to fetch SEO settings";
+      return res.status(500).json({ error: msg });
+    }
+  });
+
+  // Admin: update SEO settings
+  app.put("/api/admin/seo-settings", requireAdmin, async (req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase not configured" });
+    }
+    const { settings } = req.body ?? {};
+    if (!settings || typeof settings !== "object") {
+      return res.status(400).json({ error: "Missing settings object" });
+    }
+
+    if (settings.min_domain_rating !== undefined) {
+      const dr = Number(settings.min_domain_rating);
+      if (isNaN(dr) || dr < 0 || dr > 100) {
+        return res.status(400).json({ error: "min_domain_rating must be between 0 and 100" });
+      }
+    }
+
+    try {
+      const now = new Date().toISOString();
+      for (const [key, value] of Object.entries(settings)) {
+        const { error } = await supabaseAdmin
+          .from("seo_settings")
+          .upsert({ key, value: String(value), updated_at: now }, { onConflict: "key" });
+        if (error) throw error;
+      }
+      return res.json({ ok: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to update SEO settings";
+      return res.status(500).json({ error: msg });
+    }
+  });
+
+  // Public: SEO settings for the SEO agent bot
+  app.get("/api/seo-settings/public", async (_req, res) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Supabase not configured" });
+    }
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("seo_settings")
+        .select("key, value");
+      if (error) throw error;
+
+      const settings: Record<string, string> = {};
+      for (const row of data ?? []) {
+        settings[row.key] = row.value;
+      }
+      return res.json({ settings });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to fetch SEO settings";
+      return res.status(500).json({ error: msg });
+    }
+  });
+
   // Embed partner signup notification + user confirmation
   app.post("/api/embed-notify-signup", async (req, res) => {
     if (!process.env.RESEND_API_KEY) {
