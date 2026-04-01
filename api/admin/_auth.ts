@@ -4,17 +4,14 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 const COOKIE_NAME = "admin_token";
 const MAX_AGE_SECONDS = 8 * 60 * 60; // 8 hours
 
-function getAdminPassword(): string {
-  return process.env.ADMIN_PASSWORD || "Rayleigh11";
-}
-
 function getSigningSecret(): string {
-  return process.env.ADMIN_TOKEN_SECRET || getAdminPassword();
+  return process.env.ADMIN_TOKEN_SECRET || process.env.ADMIN_PASSWORD || "Rayleigh11";
 }
 
-export function createToken(): string {
+export function createToken(email: string): string {
   const payload = JSON.stringify({
     admin: true,
+    email,
     exp: Math.floor(Date.now() / 1000) + MAX_AGE_SECONDS,
   });
   const payloadB64 = Buffer.from(payload).toString("base64url");
@@ -25,9 +22,9 @@ export function createToken(): string {
   return `${payloadB64}.${sig}`;
 }
 
-export function verifyToken(token: string): boolean {
+export function verifyToken(token: string): { valid: true; email: string } | { valid: false } {
   const parts = token.split(".");
-  if (parts.length !== 2) return false;
+  if (parts.length !== 2) return { valid: false };
   const [payloadB64, sig] = parts;
 
   const expectedSig = crypto
@@ -35,26 +32,27 @@ export function verifyToken(token: string): boolean {
     .update(payloadB64)
     .digest("hex");
 
-  if (sig.length !== expectedSig.length) return false;
-  const valid = crypto.timingSafeEqual(
+  if (sig.length !== expectedSig.length) return { valid: false };
+  const sigMatch = crypto.timingSafeEqual(
     Buffer.from(sig, "hex"),
     Buffer.from(expectedSig, "hex"),
   );
-  if (!valid) return false;
+  if (!sigMatch) return { valid: false };
 
   try {
     const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString());
-    if (!payload.admin) return false;
-    if (typeof payload.exp !== "number") return false;
-    if (payload.exp < Math.floor(Date.now() / 1000)) return false;
-    return true;
+    if (!payload.admin) return { valid: false };
+    if (typeof payload.exp !== "number") return { valid: false };
+    if (payload.exp < Math.floor(Date.now() / 1000)) return { valid: false };
+    if (typeof payload.email !== "string") return { valid: false };
+    return { valid: true, email: payload.email };
   } catch {
-    return false;
+    return { valid: false };
   }
 }
 
-export function setAuthCookie(res: VercelResponse): void {
-  const token = createToken();
+export function setAuthCookie(res: VercelResponse, email: string): void {
+  const token = createToken(email);
   const secure = process.env.NODE_ENV === "production";
   const parts = [
     `${COOKIE_NAME}=${token}`,
@@ -67,16 +65,23 @@ export function setAuthCookie(res: VercelResponse): void {
   res.setHeader("Set-Cookie", parts.join("; "));
 }
 
-export function isAdmin(req: VercelRequest): boolean {
-  const token = req.cookies?.[COOKIE_NAME];
-  if (!token) return false;
-  return verifyToken(token);
+export function clearAuthCookie(res: VercelResponse): void {
+  const secure = process.env.NODE_ENV === "production";
+  const parts = [
+    `${COOKIE_NAME}=`,
+    "HttpOnly",
+    "SameSite=Lax",
+    `Path=/api/admin`,
+    `Max-Age=0`,
+  ];
+  if (secure) parts.push("Secure");
+  res.setHeader("Set-Cookie", parts.join("; "));
 }
 
-export function validatePassword(password: string): boolean {
-  const expected = getAdminPassword();
-  const a = Buffer.from(password);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
+export function isAdmin(req: VercelRequest): { authenticated: true; email: string } | { authenticated: false } {
+  const token = req.cookies?.[COOKIE_NAME];
+  if (!token) return { authenticated: false };
+  const result = verifyToken(token);
+  if (!result.valid) return { authenticated: false };
+  return { authenticated: true, email: result.email };
 }
