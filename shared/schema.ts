@@ -1,7 +1,15 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, jsonb, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, jsonb, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Admin users for backend authentication
+export const adminUsers = pgTable("admin_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 // Room plans stored on server for sharing
 export const roomPlans = pgTable("room_plans", {

@@ -16,7 +16,8 @@ interface EmbedPartner {
   plan_exported_count: number;
 }
 
-function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+function LoginForm({ onSuccess }: { onSuccess: (email: string) => void }) {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,12 +27,14 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     setError("");
     setLoading(true);
     try {
-      await apiRequest("POST", "/api/admin/login", { password });
-      onSuccess();
+      await apiRequest("POST", "/api/admin/login", { email, password });
+      onSuccess(email);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.startsWith("401")) {
-        setError("Invalid password");
+      if (msg.startsWith("429")) {
+        setError("Too many attempts. Please wait a few minutes and try again.");
+      } else if (msg.startsWith("401")) {
+        setError("Invalid email or password");
       } else {
         setError("Login failed. Please try again.");
         console.error("Admin login error:", msg);
@@ -43,26 +46,60 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   return (
     <div className="min-h-screen bg-[#faf8f4] text-[#1a1a18] flex items-center justify-center">
       <div className="w-full max-w-sm px-5">
-        <h1 className="text-2xl font-bold mb-1 text-center">Admin</h1>
-        <p className="text-[#6b6457] mb-8 text-center text-sm">Enter the admin password to continue.</p>
-        <form onSubmit={handleSubmit}>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            autoFocus
-            className="w-full border border-[#d8d2c4] rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#3d8a7c] transition-colors"
-          />
-          {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading || !password}
-            className="w-full mt-4 bg-[#3d8a7c] text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-[#357a6e] disabled:opacity-50 transition-colors"
-          >
-            {loading ? "Checking..." : "Log in"}
-          </button>
-        </form>
+        <div className="bg-white rounded-xl border border-[#e8e3d8] shadow-sm p-8">
+          {/* Lock icon */}
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 rounded-full bg-[#e8f5f1] flex items-center justify-center">
+              <svg className="w-6 h-6 text-[#3d8a7c]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+            </div>
+          </div>
+
+          <h1 className="text-xl font-bold mb-1 text-center">Admin Login</h1>
+          <p className="text-[#6b6457] mb-6 text-center text-sm">Sign in to manage your site.</p>
+
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <label htmlFor="admin-email" className="block text-sm font-medium text-[#6b6457] mb-1">Email</label>
+              <input
+                id="admin-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@example.com"
+                autoFocus
+                autoComplete="email"
+                className="w-full border border-[#d8d2c4] rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#3d8a7c] transition-colors"
+              />
+            </div>
+            <div>
+              <label htmlFor="admin-password" className="block text-sm font-medium text-[#6b6457] mb-1">Password</label>
+              <input
+                id="admin-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                autoComplete="current-password"
+                className="w-full border border-[#d8d2c4] rounded-lg px-4 py-2.5 text-sm bg-white focus:outline-none focus:border-[#3d8a7c] transition-colors"
+              />
+            </div>
+            {error && <p className="text-red-600 text-sm">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading || !email || !password}
+              className="w-full bg-[#3d8a7c] text-white rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-[#357a6e] disabled:opacity-50 transition-colors"
+            >
+              {loading ? "Signing in..." : "Sign in"}
+            </button>
+          </form>
+        </div>
+
+        <p className="text-center mt-6">
+          <a href="/" className="text-sm text-[#3d8a7c] hover:underline">&larr; Return to site</a>
+        </p>
       </div>
     </div>
   );
@@ -183,6 +220,7 @@ function EmbedReport() {
 
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [adminEmail, setAdminEmail] = useState<string | null>(null);
   const [heroExists, setHeroExists] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -195,9 +233,22 @@ export default function Admin() {
   useEffect(() => {
     fetch("/api/admin/auth-status", { credentials: "include" })
       .then((r) => r.json())
-      .then((d) => setIsAuthenticated(d.authenticated))
+      .then((d) => {
+        setIsAuthenticated(d.authenticated);
+        if (d.authenticated && d.email) setAdminEmail(d.email);
+      })
       .catch(() => setIsAuthenticated(false));
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/admin/logout");
+    } catch {
+      // Ignore errors — clear client state regardless
+    }
+    setIsAuthenticated(false);
+    setAdminEmail(null);
+  };
 
   const getPublicUrl = useCallback((): string | null => {
     if (!supabase) return null;
@@ -330,14 +381,35 @@ export default function Admin() {
 
   // Not authenticated — show login
   if (!isAuthenticated) {
-    return <LoginForm onSuccess={() => setIsAuthenticated(true)} />;
+    return (
+      <LoginForm
+        onSuccess={(email) => {
+          setIsAuthenticated(true);
+          setAdminEmail(email);
+        }}
+      />
+    );
   }
 
   // Authenticated — show admin content
   return (
     <div className="min-h-screen bg-[#faf8f4] text-[#1a1a18]">
       <div className="max-w-3xl mx-auto px-5 py-16">
-        <a href="/" className="text-sm text-[#3d8a7c] hover:underline mb-6 inline-block">&larr; Back to site</a>
+        <div className="flex items-center justify-between mb-6">
+          <a href="/" className="text-sm text-[#3d8a7c] hover:underline">&larr; Back to site</a>
+          <div className="flex items-center gap-4">
+            {adminEmail && (
+              <span className="text-sm text-[#9a9488]">{adminEmail}</span>
+            )}
+            <button
+              onClick={handleLogout}
+              className="text-sm text-[#6b6457] hover:text-[#1a1a18] transition-colors"
+            >
+              Log out
+            </button>
+          </div>
+        </div>
+
         <h1 className="text-3xl font-bold mb-2">Admin</h1>
         <p className="text-[#6b6457] mb-10">Manage the homepage hero image and view embed analytics.</p>
 

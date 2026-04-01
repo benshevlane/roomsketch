@@ -25,7 +25,7 @@ function getHeroPublicUrl(): string | null {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (!isAdmin(req)) {
+  if (!isAdmin(req).authenticated) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   if (!supabaseAdmin) {

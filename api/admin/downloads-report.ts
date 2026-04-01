@@ -6,7 +6,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
-  if (!isAdmin(req)) {
+  if (!isAdmin(req).authenticated) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   if (!supabaseAdmin) {

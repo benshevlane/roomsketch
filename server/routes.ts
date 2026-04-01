@@ -1,14 +1,50 @@
-import crypto from "crypto";
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { Resend } from "resend";
 import { storage } from "./storage";
 import { supabaseAdmin } from "./supabase";
+import { verifyPassword } from "./auth";
 import { contactFormSchema, feedbackFormSchema, embedSignupNotificationSchema } from "../shared/email-schemas";
 
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (req.session?.isAdmin) return next();
   return res.status(401).json({ error: "Unauthorized" });
+}
+
+// Rate limiting for login
+const loginAttempts = new Map<string, { count: number; firstAttempt: number }>();
+const MAX_ATTEMPTS = 5;
+const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function getClientIp(req: Request): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string") return forwarded.split(",")[0].trim();
+  return req.ip || "unknown";
+}
+
+function checkRateLimit(ip: string): { blocked: boolean; retryAfterSeconds?: number } {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry) return { blocked: false };
+  if (now - entry.firstAttempt > WINDOW_MS) {
+    loginAttempts.delete(ip);
+    return { blocked: false };
+  }
+  if (entry.count >= MAX_ATTEMPTS) {
+    const retryAfterSeconds = Math.ceil((entry.firstAttempt + WINDOW_MS - now) / 1000);
+    return { blocked: true, retryAfterSeconds };
+  }
+  return { blocked: false };
+}
+
+function recordFailedAttempt(ip: string): void {
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now - entry.firstAttempt > WINDOW_MS) {
+    loginAttempts.set(ip, { count: 1, firstAttempt: now });
+  } else {
+    entry.count++;
+  }
 }
 
 const BUCKET = "hero-images";
@@ -67,24 +103,73 @@ export async function registerRoutes(
 
   // Admin: login
   app.post("/api/admin/login", async (req, res) => {
-    const { password } = req.body ?? {};
-    const expected = process.env.ADMIN_PASSWORD || "Rayleigh11";
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(ip);
+    if (rateCheck.blocked) {
+      res.setHeader("Retry-After", String(rateCheck.retryAfterSeconds));
+      return res.status(429).json({
+        error: "Too many login attempts. Please try again later.",
+        retryAfterSeconds: rateCheck.retryAfterSeconds,
+      });
+    }
+
+    const { email, password } = req.body ?? {};
+    if (typeof email !== "string" || email.length === 0) {
+      return res.status(400).json({ error: "Email required" });
+    }
     if (typeof password !== "string" || password.length === 0) {
       return res.status(400).json({ error: "Password required" });
     }
-    const a = Buffer.from(password);
-    const b = Buffer.from(expected);
-    const valid = a.length === b.length && crypto.timingSafeEqual(a, b);
-    if (!valid) {
-      return res.status(401).json({ error: "Invalid password" });
+
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: "Database not configured" });
     }
+
+    const { data: admin, error: dbError } = await supabaseAdmin
+      .from("admin_users")
+      .select("id, email, password_hash")
+      .eq("email", email.toLowerCase())
+      .maybeSingle();
+
+    if (dbError) {
+      console.error("Admin login DB error:", dbError.message);
+      return res.status(500).json({ error: "Internal error" });
+    }
+
+    if (!admin) {
+      recordFailedAttempt(ip);
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const valid = await verifyPassword(password, admin.password_hash);
+    if (!valid) {
+      recordFailedAttempt(ip);
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    loginAttempts.delete(ip);
     req.session.isAdmin = true;
+    req.session.adminEmail = admin.email;
     return res.json({ ok: true });
   });
 
   // Admin: check auth status
   app.get("/api/admin/auth-status", (req, res) => {
-    res.json({ authenticated: !!req.session?.isAdmin });
+    if (req.session?.isAdmin) {
+      return res.json({ authenticated: true, email: req.session.adminEmail });
+    }
+    return res.json({ authenticated: false });
+  });
+
+  // Admin: logout
+  app.post("/api/admin/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Logout failed" });
+      }
+      res.clearCookie("connect.sid");
+      return res.json({ ok: true });
+    });
   });
 
   // Admin: embed users report
