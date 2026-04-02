@@ -99,11 +99,11 @@ export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect, cl
   return (
     <div className={cn("w-60 border-r border-border bg-card flex flex-col", className)} data-testid="furniture-panel">
       <div className="p-3 border-b border-border">
-        <h3 className="text-sm font-semibold mb-2">Items Library</h3>
+        <h3 className="text-sm font-semibold mb-2">Add Objects</h3>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder="Search items..."
+            placeholder="Search objects..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8 h-8 text-sm"
@@ -156,7 +156,7 @@ export default function FurniturePanel({ onSelectFurniture, onSwitchToSelect, cl
             );
           })}
           {filtered.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-8">No items found</p>
+            <p className="text-sm text-muted-foreground text-center py-8">No objects found</p>
           )}
         </div>
       </ScrollArea>

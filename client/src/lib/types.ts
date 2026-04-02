@@ -129,7 +129,7 @@ export const DEFAULT_TEXT_BOX: Omit<TextBox, "id" | "x" | "y"> = {
   zIndex: 0,
 };
 
-export type EditorTool = "select" | "wall" | "arrow" | "furniture" | "label" | "eraser";
+export type EditorTool = "select" | "wall" | "arrow" | "furniture" | "label" | "eraser" | "ruler";
 
 export type UnitSystem = "m" | "cm" | "mm" | "ft";
 

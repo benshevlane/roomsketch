@@ -25,10 +25,11 @@ import {
   Image,
   FolderOpen,
   MoreHorizontal,
-  LayoutList,
+  LayoutGrid,
   SlidersHorizontal,
   Tags,
   TextCursorInput,
+  Ruler,
 } from "lucide-react";
 
 interface EditorToolbarProps {
@@ -58,6 +59,9 @@ interface EditorToolbarProps {
   onTogglePropertiesPanel?: () => void;
   componentLabelsVisible: boolean;
   onToggleComponentLabels: () => void;
+  showMeasurements: boolean;
+  onToggleMeasurements: () => void;
+  furniturePanelOpen?: boolean;
 }
 
 const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shortcut: string }[] = [
@@ -65,6 +69,7 @@ const tools: { tool: EditorTool; icon: typeof MousePointer2; label: string; shor
   { tool: "wall", icon: Pencil, label: "Draw Walls", shortcut: "W" },
   { tool: "arrow", icon: MoveRight, label: "Draw Arrow", shortcut: "A" },
   { tool: "eraser", icon: Eraser, label: "Eraser", shortcut: "E" },
+  { tool: "ruler", icon: Ruler, label: "Ruler Tool", shortcut: "R" },
 ];
 
 export default function EditorToolbar({
@@ -94,6 +99,9 @@ export default function EditorToolbar({
   onTogglePropertiesPanel,
   componentLabelsVisible,
   onToggleComponentLabels,
+  showMeasurements,
+  onToggleMeasurements,
+  furniturePanelOpen,
 }: EditorToolbarProps) {
   if (isMobile) {
     const btnClass = "h-11 w-11 flex-shrink-0";
@@ -101,8 +109,9 @@ export default function EditorToolbar({
       <div className="border-b border-border bg-card overflow-hidden" data-testid="editor-toolbar">
         {/* Row 1: Library + Tools + Undo/Redo + Properties */}
         <div className="flex items-center gap-0.5 px-2 py-1 overflow-x-auto scrollbar-hide">
-          <Button size="icon" variant="ghost" className={btnClass} onClick={onToggleFurniturePanel} data-testid="btn-library">
-            <LayoutList className="h-5 w-5" />
+          <Button variant={furniturePanelOpen ? "default" : "ghost"} className="h-11 min-w-[44px] px-3 flex-shrink-0" onClick={onToggleFurniturePanel} data-testid="btn-library">
+            <LayoutGrid className="h-5 w-5 mr-1.5" />
+            <span className="text-xs font-medium">Add Objects</span>
           </Button>
 
           <Separator orientation="vertical" className="h-6 mx-0.5 flex-shrink-0" />
@@ -200,6 +209,10 @@ export default function EditorToolbar({
               <DropdownMenuItem onClick={onToggleComponentLabels}>
                 <Tags className="h-4 w-4 mr-2" />
                 Labels: {componentLabelsVisible ? "On" : "Off"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onToggleMeasurements}>
+                <Ruler className="h-4 w-4 mr-2" />
+                Measurements: {showMeasurements ? "On" : "Off"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onClearAll} className="text-destructive">
@@ -350,7 +363,7 @@ export default function EditorToolbar({
               Clear
             </Button>
           </TooltipTrigger>
-          <TooltipContent><p>Clear all items</p></TooltipContent>
+          <TooltipContent><p>Clear all objects</p></TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -416,6 +429,21 @@ export default function EditorToolbar({
             </Button>
           </TooltipTrigger>
           <TooltipContent><p>{componentLabelsVisible ? "Hide component labels" : "Show component labels"}</p></TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant={showMeasurements ? "default" : "outline"}
+              onClick={onToggleMeasurements}
+              data-testid="btn-toggle-measurements"
+              className="text-xs px-2"
+            >
+              <Ruler className="h-3.5 w-3.5 mr-1" />
+              Measurements
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent><p>{showMeasurements ? "Hide measurement overlays" : "Show measurement overlays"}</p></TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>

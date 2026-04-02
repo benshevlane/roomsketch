@@ -47,7 +47,7 @@ const steps = [
     icon: Rocket,
     title: "You're Ready!",
     description:
-      "Drag items from the furniture library on the left, or start by drawing your room\u2019s walls. Your plan auto-saves in the browser. When you\u2019re done, hit Save Image to export as PNG.",
+      "Drag objects from the library on the left, or start by drawing your room\u2019s walls. Your plan auto-saves in the browser. When you\u2019re done, hit Save Image to export as PNG.",
   },
 ];
 

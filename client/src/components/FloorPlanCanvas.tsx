@@ -62,6 +62,7 @@ import {
 } from "../lib/canvas-renderer";
 import { isWallCupboard } from "../lib/types";
 import { detectRooms } from "../lib/room-detection";
+import MeasurementOverlay from "./MeasurementOverlay";
 
 interface FloorPlanCanvasProps {
   state: EditorState;
@@ -99,6 +100,11 @@ interface FloorPlanCanvasProps {
   onUpdateWallLabelOffset: (wallId: string, offset: number, pinned: boolean) => void;
   autoEditTextBoxId?: string | null;
   onClearAutoEditTextBox?: () => void;
+  showMeasurements: boolean;
+  rulerFirstItemId: string | null;
+  rulerSecondItemId: string | null;
+  onSetRulerFirst: (id: string | null) => void;
+  onSetRulerSecond: (id: string | null) => void;
 }
 
 export default function FloorPlanCanvas({
@@ -137,9 +143,15 @@ export default function FloorPlanCanvas({
   onUpdateWallLabelOffset,
   autoEditTextBoxId,
   onClearAutoEditTextBox,
+  showMeasurements,
+  rulerFirstItemId,
+  rulerSecondItemId,
+  onSetRulerFirst,
+  onSetRulerSecond,
 }: FloorPlanCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [overlaySize, setOverlaySize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const [mousePos, setMousePos] = useState<Point>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
@@ -270,6 +282,7 @@ export default function FloorPlanCanvas({
       canvas.height = container.clientHeight * dpr;
       canvas.style.width = `${container.clientWidth}px`;
       canvas.style.height = `${container.clientHeight}px`;
+      setOverlaySize({ w: container.clientWidth, h: container.clientHeight });
     };
 
     if (typeof ResizeObserver === "undefined") {
@@ -1022,9 +1035,26 @@ export default function FloorPlanCanvas({
         // We need to store the world position for when we commit
         editingLabelWorldPos.current = snapped;
         setTimeout(() => labelInputRef.current?.focus(), 0);
+      } else if (state.selectedTool === "ruler") {
+        const hitFurn = hitTestFurniture(pos.x, pos.y, state.furniture, state.gridSize, state.zoom, state.panOffset);
+        if (hitFurn) {
+          if (!rulerFirstItemId) {
+            onSetRulerFirst(hitFurn.id);
+          } else if (!rulerSecondItemId) {
+            onSetRulerSecond(hitFurn.id);
+          } else {
+            // Both set — start a new measurement from this item
+            onSetRulerFirst(hitFurn.id);
+            onSetRulerSecond(null);
+          }
+        } else {
+          // Click on empty canvas — clear ruler
+          onSetRulerFirst(null);
+          onSetRulerSecond(null);
+        }
       }
     },
-    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onRemoveArrow, onPushUndo, onUpdateFurniture, onSplitWallAndConnect, onAddArrow, arrowDrawingStart, onSetLabelOffset, editingLabel]
+    [state, getCanvasPos, onSelectItem, onAddWall, onSetWallDrawing, onRemoveWall, onRemoveFurniture, onRemoveLabel, onRemoveArrow, onPushUndo, onUpdateFurniture, onSplitWallAndConnect, onAddArrow, arrowDrawingStart, onSetLabelOffset, editingLabel, rulerFirstItemId, rulerSecondItemId, onSetRulerFirst, onSetRulerSecond]
   );
 
   // Store world position for new labels
@@ -1990,6 +2020,11 @@ export default function FloorPlanCanvas({
         setArrowDrawingStart(null);
         onSelectItem(null);
         setSelectedRoomKey(null);
+        // Clear ruler state
+        if (state.selectedTool === "ruler") {
+          onSetRulerFirst(null);
+          onSetRulerSecond(null);
+        }
       }
       if (e.key === "Delete" || e.key === "Backspace") {
         if (editingTextBoxId) return; // Don't delete while editing text
@@ -2009,7 +2044,7 @@ export default function FloorPlanCanvas({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [state.selectedItemId, state.furniture, state.walls, state.labels, state.textBoxes, state.arrows, editingTextBoxId, onRemoveFurniture, onRemoveWall, onRemoveLabel, onRemoveTextBox, onRemoveArrow, onSetWallDrawing, onSelectItem]);
+  }, [state.selectedItemId, state.selectedTool, state.furniture, state.walls, state.labels, state.textBoxes, state.arrows, editingTextBoxId, onRemoveFurniture, onRemoveWall, onRemoveLabel, onRemoveTextBox, onRemoveArrow, onSetWallDrawing, onSelectItem, onSetRulerFirst, onSetRulerSecond]);
 
   // Prevent native context menu so right-click can pan
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -2030,6 +2065,7 @@ export default function FloorPlanCanvas({
     if (state.selectedTool === "wall") return "crosshair";
     if (state.selectedTool === "arrow") return "crosshair";
     if (state.selectedTool === "eraser") return "crosshair";
+    if (state.selectedTool === "ruler") return "crosshair";
     if (state.selectedTool === "label") return "text";
     if (wallDragStart) return "grabbing";
     if (isDraggingLabel) return "grabbing";
@@ -2067,6 +2103,19 @@ export default function FloorPlanCanvas({
         onDrop={handleDrop}
         onContextMenu={handleContextMenu}
         data-testid="floor-plan-canvas"
+      />
+      {/* Measurement overlay (SVG) */}
+      <MeasurementOverlay
+        furniture={state.furniture}
+        walls={state.walls}
+        gridSize={state.gridSize}
+        zoom={state.zoom}
+        panOffset={state.panOffset}
+        showMeasurements={showMeasurements}
+        rulerFirstItemId={rulerFirstItemId}
+        rulerSecondItemId={rulerSecondItemId}
+        width={overlaySize.w}
+        height={overlaySize.h}
       />
       {/* Text box overlays */}
       {state.textBoxes.map((tb) => (

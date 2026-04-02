@@ -200,7 +200,7 @@ export default function RoomTabs({
           <DialogHeader>
             <DialogTitle>Delete room?</DialogTitle>
             <DialogDescription>
-              "{deleteRoom?.name}" contains items. Are you sure you want to delete it? This cannot be undone.
+              "{deleteRoom?.name}" contains objects. Are you sure you want to delete it? This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">

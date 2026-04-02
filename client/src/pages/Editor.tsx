@@ -220,7 +220,7 @@ export default function Editor() {
                 <span className="font-medium tabular-nums">{state.walls.length}</span>
               </div>
               <div className="flex justify-between">
-                <span>Items</span>
+                <span>Objects</span>
                 <span className="font-medium tabular-nums">{state.furniture.length}</span>
               </div>
               <div className="flex justify-between">

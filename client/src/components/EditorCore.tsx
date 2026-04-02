@@ -99,8 +99,19 @@ export default function EditorCore({
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [furniturePanelOpen, setFurniturePanelOpen] = useState(false);
   const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
+  const [showMeasurements, setShowMeasurements] = useState(false);
+  const [rulerFirstItemId, setRulerFirstItemId] = useState<string | null>(null);
+  const [rulerSecondItemId, setRulerSecondItemId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: "", visible: false });
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear ruler state when switching away from ruler tool
+  useEffect(() => {
+    if (state.selectedTool !== "ruler") {
+      setRulerFirstItemId(null);
+      setRulerSecondItemId(null);
+    }
+  }, [state.selectedTool]);
 
   // Clipboard for copy/paste
   const clipboardRef = useRef<{ type: "furniture"; data: FurnitureItem } | { type: "label"; data: RoomLabel } | { type: "textbox"; data: TextBox } | { type: "arrow"; data: Arrow } | null>(null);
@@ -254,6 +265,9 @@ export default function EditorCore({
       }
       if (e.key === "e" || e.key === "E") {
         if (!e.ctrlKey && !e.metaKey) editor.setTool("eraser");
+      }
+      if (e.key === "r" || e.key === "R") {
+        if (!e.ctrlKey && !e.metaKey) editor.setTool("ruler");
       }
       if (e.key === "t" || e.key === "T") {
         if (!e.ctrlKey && !e.metaKey) handleAddTextBox();
@@ -555,6 +569,9 @@ export default function EditorCore({
           componentLabelsVisible={state.componentLabelsVisible}
           onToggleComponentLabels={editor.toggleComponentLabels}
           onAddTextBox={handleAddTextBox}
+          showMeasurements={showMeasurements}
+          onToggleMeasurements={() => setShowMeasurements((v) => !v)}
+          furniturePanelOpen={furniturePanelOpen}
         />
       )}
 
@@ -577,7 +594,7 @@ export default function EditorCore({
             {/* Mobile: Furniture panel in a left sheet */}
             <Sheet open={furniturePanelOpen} onOpenChange={setFurniturePanelOpen}>
               <SheetContent side="left" className="p-0 w-72" onOpenAutoFocus={(e) => e.preventDefault()}>
-                <SheetTitle className="sr-only">Items Library</SheetTitle>
+                <SheetTitle className="sr-only">Add Objects</SheetTitle>
                 <FurniturePanel
                   className="w-full h-full border-r-0"
                   onSelectFurniture={(t) => { handleSelectFurniture(t); setFurniturePanelOpen(false); }}
@@ -656,6 +673,11 @@ export default function EditorCore({
           onUpdateWallLabelOffset={editor.updateWallLabelOffset}
           autoEditTextBoxId={autoEditTextBoxId}
           onClearAutoEditTextBox={() => setAutoEditTextBoxId(null)}
+          showMeasurements={showMeasurements}
+          rulerFirstItemId={rulerFirstItemId}
+          rulerSecondItemId={rulerSecondItemId}
+          onSetRulerFirst={setRulerFirstItemId}
+          onSetRulerSecond={setRulerSecondItemId}
         />
 
         {/* Desktop: Properties sidebar */}

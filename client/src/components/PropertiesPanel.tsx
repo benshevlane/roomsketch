@@ -75,7 +75,7 @@ export default function PropertiesPanel({
     return (
       <div className="p-4 text-sm text-muted-foreground" data-testid="properties-empty">
         <p className="font-medium text-foreground mb-1">Properties</p>
-        <p>Select an item to view its properties</p>
+        <p>Select an object to view its properties</p>
       </div>
     );
   }
