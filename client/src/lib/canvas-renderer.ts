@@ -1995,15 +1995,16 @@ export function collectWallMeasurementLabelRects(
 
   // Merged groups
   for (const group of collinearGroups.values()) {
-    const sx = group.mergedStart.x * pxPerCm + panOffset.x;
-    const sy = group.mergedStart.y * pxPerCm + panOffset.y;
-    const ex = group.mergedEnd.x * pxPerCm + panOffset.x;
-    const ey = group.mergedEnd.y * pxPerCm + panOffset.y;
+    const sx = group.minP.x * pxPerCm + panOffset.x;
+    const sy = group.minP.y * pxPerCm + panOffset.y;
+    const ex = group.maxP.x * pxPerCm + panOffset.x;
+    const ey = group.maxP.y * pxPerCm + panOffset.y;
     const lengthPx = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2);
     if (lengthPx < 30) continue;
 
-    const thickness = group.thickness;
-    const { startExtension, endExtension } = getEndpointExtensions(group.mergedStart, group.mergedEnd, thickness, walls);
+    const representativeWallForThickness = walls.find(w => group.wallIds.has(w.id));
+    const thickness = representativeWallForThickness?.thickness ?? DEFAULT_WALL_THICKNESS;
+    const { startExtension, endExtension } = getEndpointExtensions(group.minP, group.maxP, thickness, walls);
     const halfThick = thickness / 2;
     const displayLengthCm = measureMode === "inside"
       ? group.totalLengthCm - thickness
