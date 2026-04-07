@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { RotateCw, Trash2, Ruler, Copy, Bold, Square, FlipHorizontal } from "lucide-react";
+import { RotateCw, Trash2, Ruler, Copy, Bold, Square, FlipHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from "lucide-react";
 
 interface PropertiesPanelProps {
   selectedWall: Wall | null;
@@ -21,6 +21,7 @@ interface PropertiesPanelProps {
   onUpdateTextBox?: (id: string, updates: Partial<TextBox>) => void;
   onUpdateWall?: (id: string, updates: Partial<Wall>) => void;
   onUpdateArrow?: (id: string, updates: Partial<Arrow>) => void;
+  onNudge?: (dx: number, dy: number) => void;
   units: UnitSystem;
 }
 
@@ -69,6 +70,7 @@ export default function PropertiesPanel({
   onUpdateTextBox,
   onUpdateWall,
   onUpdateArrow,
+  onNudge,
   units,
 }: PropertiesPanelProps) {
   if (!selectedWall && !selectedFurniture && !selectedLabel && !selectedTextBox && !selectedArrow) {
@@ -292,6 +294,30 @@ export default function PropertiesPanel({
             <span className="text-muted-foreground">Rotation:</span>
             <span className="font-medium">{selectedFurniture.rotation}°</span>
           </div>
+          {onNudge && (
+            <div className="space-y-1">
+              <span className="text-muted-foreground text-xs">Nudge (1cm)</span>
+              <div className="grid grid-cols-3 w-fit gap-1">
+                <div />
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => onNudge(0, -1)} aria-label="Nudge up">
+                  <ArrowUp className="h-3.5 w-3.5" />
+                </Button>
+                <div />
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => onNudge(-1, 0)} aria-label="Nudge left">
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                </Button>
+                <div />
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => onNudge(1, 0)} aria-label="Nudge right">
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+                <div />
+                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => onNudge(0, 1)} aria-label="Nudge down">
+                  <ArrowDown className="h-3.5 w-3.5" />
+                </Button>
+                <div />
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">Category:</span>
             <span className="font-medium">{selectedFurniture.category}</span>

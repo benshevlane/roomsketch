@@ -322,6 +322,16 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     }));
   }, []);
 
+  const nudgeFurniture = useCallback((id: string, dx: number, dy: number) => {
+    pushUndo();
+    setState((s) => ({
+      ...s,
+      furniture: s.furniture.map((f) =>
+        f.id === id ? { ...f, x: f.x + dx, y: f.y + dy } : f
+      ),
+    }));
+  }, [pushUndo]);
+
   const moveWall = useCallback((id: string, updates: Partial<Wall>) => {
     setState((s) => ({
       ...s,
@@ -881,6 +891,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     addFurniture,
     moveWall,
     moveFurniture,
+    nudgeFurniture,
     rotateFurniture,
     mirrorFurniture,
     removeFurniture,

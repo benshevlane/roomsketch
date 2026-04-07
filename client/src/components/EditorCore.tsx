@@ -300,10 +300,18 @@ export default function EditorCore({
         if (e.target instanceof HTMLElement && e.target.isContentEditable) return;
         handleDeleteSelected();
       }
+
+      // Arrow keys: nudge selected furniture by 1cm
+      if (selectedFurniture && (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        const dx = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
+        const dy = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+        editor.nudgeFurniture(selectedFurniture.id, dx, dy);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [editor, handleCopy, handlePaste, handleDuplicate, handleAddTextBox, handleDeleteSelected, state.wallDrawing, state.selectedItemId, state.selectedTool]);
+  }, [editor, handleCopy, handlePaste, handleDuplicate, handleAddTextBox, handleDeleteSelected, state.wallDrawing, state.selectedItemId, state.selectedTool, selectedFurniture]);
 
   const handleRotateSelected = useCallback(() => {
     if (selectedFurniture) editor.rotateFurniture(selectedFurniture.id);
@@ -311,6 +319,10 @@ export default function EditorCore({
 
   const handleMirrorSelected = useCallback(() => {
     if (selectedFurniture) editor.mirrorFurniture(selectedFurniture.id);
+  }, [selectedFurniture, editor]);
+
+  const handleNudgeFurniture = useCallback((dx: number, dy: number) => {
+    if (selectedFurniture) editor.nudgeFurniture(selectedFurniture.id, dx, dy);
   }, [selectedFurniture, editor]);
 
   const handleSavePlan = useCallback(async () => {
@@ -650,6 +662,7 @@ export default function EditorCore({
                       onUpdateTextBox={editor.updateTextBox}
                       onUpdateWall={editor.updateWall}
                       onUpdateArrow={editor.updateArrow}
+                      onNudge={handleNudgeFurniture}
                       units={state.units}
                     />
                   </ScrollArea>
@@ -720,6 +733,7 @@ export default function EditorCore({
                 onUpdateTextBox={editor.updateTextBox}
                 onUpdateWall={editor.updateWall}
                 onUpdateArrow={editor.updateArrow}
+                onNudge={handleNudgeFurniture}
                 units={state.units}
               />
             </ScrollArea>
