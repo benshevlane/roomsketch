@@ -334,7 +334,7 @@ export default function FloorPlanCanvas({
     // Wall preview with snapping, angle snap, alignment guides
     if (state.wallDrawing && state.selectedTool === "wall") {
       const worldMouse = screenToWorld(mousePos.x, mousePos.y, state.gridSize, state.zoom, state.panOffset);
-      const gridSnapped = snapToGrid(worldMouse, 10);
+      const gridSnapped = snapToGrid(worldMouse, 1);
       // Check snap against raw world position for accurate distance
       let { snapped: wallSnapped, didSnap: epSnap } = snapToWallEndpoints(worldMouse, state.walls, 15);
       // Chain-start closure in preview
@@ -532,7 +532,7 @@ export default function FloorPlanCanvas({
     // Snap indicator and alignment guides when wall tool is active but not drawing yet
     if (state.selectedTool === "wall" && !state.wallDrawing) {
       const worldMouse = screenToWorld(mousePos.x, mousePos.y, state.gridSize, state.zoom, state.panOffset);
-      const gridSnapped = snapToGrid(worldMouse, 10);
+      const gridSnapped = snapToGrid(worldMouse, 1);
       // Check snap against raw world position for accurate distance
       const { snapped: epSnapped, didSnap: epSnapIdle } = snapToWallEndpoints(worldMouse, state.walls, 15);
       if (epSnapIdle) {
@@ -934,7 +934,7 @@ export default function FloorPlanCanvas({
         setEditingTextBoxId(null);
       } else if (state.selectedTool === "wall") {
         const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
-        const gridSnapped = snapToGrid(world, 10);
+        const gridSnapped = snapToGrid(world, 1);
         // Check endpoint snap against RAW world position (not grid-snapped)
         // so that the threshold accurately reflects cursor distance
         let { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15);
@@ -958,7 +958,7 @@ export default function FloorPlanCanvas({
           const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 15, 5);
           finalPoint = angleResult.snapped;
           // Apply grid snap to the angle-snapped point
-          finalPoint = snapToGrid(finalPoint, 10);
+          finalPoint = snapToGrid(finalPoint, 1);
         }
 
         if (currentWallDrawing) {
@@ -1539,7 +1539,7 @@ export default function FloorPlanCanvas({
         if (currentWallDrawing) {
           const pos = getCanvasPos(e);
           const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
-          const gridSnapped = snapToGrid(world, 10);
+          const gridSnapped = snapToGrid(world, 1);
           let { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15);
           // Chain-start closure: screen-space-aware snap to first point of the chain
           if (!endpointSnap && state.wallChainStart && state.walls.length >= 2) {
@@ -1556,7 +1556,7 @@ export default function FloorPlanCanvas({
           if (!didSnap) {
             const angleResult = snapAngle(currentWallDrawing.start, finalPoint, 15, 5);
             finalPoint = angleResult.snapped;
-            finalPoint = snapToGrid(finalPoint, 10);
+            finalPoint = snapToGrid(finalPoint, 1);
           }
 
           // Skip near-zero-length walls (accidental double-tap)
