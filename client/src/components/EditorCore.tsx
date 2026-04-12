@@ -696,6 +696,7 @@ export default function EditorCore({
                       onUpdateWall={editor.updateWall}
                       onUpdateArrow={editor.updateArrow}
                       onNudge={handleNudgeFurniture}
+                      walls={state.walls}
                       units={state.units}
                       measureMode={measureMode}
                     />
@@ -769,6 +770,7 @@ export default function EditorCore({
                 onUpdateWall={editor.updateWall}
                 onUpdateArrow={editor.updateArrow}
                 onNudge={handleNudgeFurniture}
+                walls={state.walls}
                 units={state.units}
                 measureMode={measureMode}
               />

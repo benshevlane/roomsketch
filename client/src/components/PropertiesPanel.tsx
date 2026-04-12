@@ -22,6 +22,7 @@ interface PropertiesPanelProps {
   onUpdateWall?: (id: string, updates: Partial<Wall>) => void;
   onUpdateArrow?: (id: string, updates: Partial<Arrow>) => void;
   onNudge?: (dx: number, dy: number) => void;
+  walls?: Wall[];
   units: UnitSystem;
   measureMode?: MeasureMode;
 }
@@ -72,6 +73,7 @@ export default function PropertiesPanel({
   onUpdateWall,
   onUpdateArrow,
   onNudge,
+  walls = [],
   units,
   measureMode = "full",
 }: PropertiesPanelProps) {
@@ -125,6 +127,22 @@ export default function PropertiesPanel({
         start: { x: startX, y: startY },
         end: { x: newEndX, y: newEndY },
       });
+      // Update connected walls: move their shared endpoint to maintain connectivity
+      const CONNECT_THRESH = 15;
+      const oldEnd = selectedWall.end;
+      for (const w of walls) {
+        if (w.id === selectedWall.id) continue;
+        const updates: Partial<Wall> = {};
+        if (Math.abs(w.start.x - oldEnd.x) < CONNECT_THRESH && Math.abs(w.start.y - oldEnd.y) < CONNECT_THRESH) {
+          updates.start = { x: newEndX, y: newEndY };
+        }
+        if (Math.abs(w.end.x - oldEnd.x) < CONNECT_THRESH && Math.abs(w.end.y - oldEnd.y) < CONNECT_THRESH) {
+          updates.end = { x: newEndX, y: newEndY };
+        }
+        if (updates.start || updates.end) {
+          onUpdateWall(w.id, updates);
+        }
+      }
     };
 
     const commitThickness = (val: string) => {
