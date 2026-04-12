@@ -6004,20 +6004,14 @@ export function snapFurnitureToWalls(
       if (bb.right > wallMinX && bb.left < wallMaxX) {
         const wallTopEdge = wallY - halfThick;
         const wallBottomEdge = wallY + halfThick;
-        // Find closest Y edge to snap to (pick nearest)
+        // Find closest Y edge to snap to — only flush (outside) candidates
         const candidates: { dist: number; newY: number; edgeCoord: number }[] = [];
-        // Snap furniture bottom to wall top edge
+        // Snap furniture bottom to wall top edge (furniture above wall, flush)
         const d1 = Math.abs(bb.bottom - wallTopEdge);
         if (d1 < threshold) candidates.push({ dist: d1, newY: wallTopEdge - aabbH - aabbOffY, edgeCoord: wallTopEdge });
-        // Snap furniture top to wall bottom edge
+        // Snap furniture top to wall bottom edge (furniture below wall, flush)
         const d2 = Math.abs(bb.top - wallBottomEdge);
         if (d2 < threshold) candidates.push({ dist: d2, newY: wallBottomEdge - aabbOffY, edgeCoord: wallBottomEdge });
-        // Snap furniture top to wall top edge
-        const d3 = Math.abs(bb.top - wallTopEdge);
-        if (d3 < threshold) candidates.push({ dist: d3, newY: wallTopEdge - aabbOffY, edgeCoord: wallTopEdge });
-        // Snap furniture bottom to wall bottom edge
-        const d4 = Math.abs(bb.bottom - wallBottomEdge);
-        if (d4 < threshold) candidates.push({ dist: d4, newY: wallBottomEdge - aabbH - aabbOffY, edgeCoord: wallBottomEdge });
         if (candidates.length > 0) {
           candidates.sort((a, b) => a.dist - b.dist);
           y = candidates[0].newY;
@@ -6048,20 +6042,14 @@ export function snapFurnitureToWalls(
       if (bb.bottom > wallMinY && bb.top < wallMaxY) {
         const wallLeftEdge = wallX - halfThick;
         const wallRightEdge = wallX + halfThick;
-        // Find closest X edge to snap to (pick nearest)
+        // Find closest X edge to snap to — only flush (outside) candidates
         const candidates: { dist: number; newX: number; edgeCoord: number }[] = [];
-        // Snap furniture right to wall left edge
+        // Snap furniture right to wall left edge (furniture left of wall, flush)
         const d1 = Math.abs(bb.right - wallLeftEdge);
         if (d1 < threshold) candidates.push({ dist: d1, newX: wallLeftEdge - aabbW - aabbOffX, edgeCoord: wallLeftEdge });
-        // Snap furniture left to wall right edge
+        // Snap furniture left to wall right edge (furniture right of wall, flush)
         const d2 = Math.abs(bb.left - wallRightEdge);
         if (d2 < threshold) candidates.push({ dist: d2, newX: wallRightEdge - aabbOffX, edgeCoord: wallRightEdge });
-        // Snap furniture left to wall left edge
-        const d3 = Math.abs(bb.left - wallLeftEdge);
-        if (d3 < threshold) candidates.push({ dist: d3, newX: wallLeftEdge - aabbOffX, edgeCoord: wallLeftEdge });
-        // Snap furniture right to wall right edge
-        const d4 = Math.abs(bb.right - wallRightEdge);
-        if (d4 < threshold) candidates.push({ dist: d4, newX: wallRightEdge - aabbW - aabbOffX, edgeCoord: wallRightEdge });
         if (candidates.length > 0) {
           candidates.sort((a, b) => a.dist - b.dist);
           x = candidates[0].newX;
