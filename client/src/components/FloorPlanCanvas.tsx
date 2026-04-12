@@ -2081,8 +2081,8 @@ export default function FloorPlanCanvas({
     onUpdateTextBox(id, { content: html });
   }, [onUpdateTextBox]);
 
-  const handleTextBoxResizeHeight = useCallback((id: string, newHeightCm: number) => {
-    onUpdateTextBox(id, { height: newHeightCm });
+  const handleTextBoxAutoFit = useCallback((id: string, widthCm: number, heightCm: number) => {
+    onUpdateTextBox(id, { width: widthCm, height: heightCm });
   }, [onUpdateTextBox]);
 
   const handleTextBoxStartResize = useCallback((id: string, corner: string, e: React.PointerEvent) => {
@@ -2341,7 +2341,7 @@ export default function FloorPlanCanvas({
           onContentChange={handleTextBoxContentChange}
           onStartResize={handleTextBoxStartResize}
           onStartRotate={handleTextBoxStartRotate}
-          onResizeHeight={handleTextBoxResizeHeight}
+          onAutoFit={handleTextBoxAutoFit}
         />
       ))}
       {/* Inline label editing overlay */}
