@@ -14,6 +14,7 @@ export interface Wall {
   thickness: number; // in cm
   wallType?: WallType; // defaults to "exterior" (30cm) when creating new walls
   measurementLabelOffset?: number;    // cm along wall axis from midpoint (positive = toward end)
+  measurementLabelPerpOffset?: number; // cm perpendicular from wall axis (convention: (-wallDirY, wallDirX))
   measurementLabelPinned?: boolean;   // true = user manually dragged, skip auto-positioning
 }
 
@@ -309,8 +310,8 @@ export const FURNITURE_LIBRARY: FurnitureTemplate[] = [
   { type: "stairs", label: "Staircase", width: 90, height: 250, category: "Structure", icon: "arrow-up" },
   { type: "radiator", label: "Radiator", width: 120, height: 60, category: "Structure", icon: "thermometer" },
   { type: "window", label: "Window", width: 100, height: 15, category: "Structure", icon: "square" },
-  { type: "door", label: "Door", width: 90, height: 15, category: "Structure", icon: "door-open" },
-  { type: "door_double", label: "Double Door", width: 150, height: 15, category: "Structure", icon: "door-open" },
+  { type: "door", label: "Door", width: 90, height: 15, category: "Structure", icon: "door-open", mirrorable: true },
+  { type: "door_double", label: "Double Door", width: 150, height: 15, category: "Structure", icon: "door-open", mirrorable: true },
   { type: "bay_window", label: "Bay Window", width: 180, height: 60, category: "Structure", icon: "square" },
   { type: "internal_wall", label: "Internal Wall", width: 100, height: 10, category: "Structure", icon: "square" },
 ];

@@ -104,7 +104,7 @@ interface FloorPlanCanvasProps {
   onSetLabelOffset: (id: string, offset: { x: number; y: number }) => void;
   onSetTool: (tool: EditorTool) => void;
   onSetRoomLabelOffset: (roomKey: string, offset: Point) => void;
-  onUpdateWallLabelOffset: (wallId: string, offset: number, pinned: boolean) => void;
+  onUpdateWallLabelOffset: (wallId: string, offset: number, pinned: boolean, perpOffset?: number) => void;
   autoEditTextBoxId?: string | null;
   onClearAutoEditTextBox?: () => void;
 }
@@ -947,7 +947,7 @@ export default function FloorPlanCanvas({
             resolvedWallLabelPositionsRef.current
           );
           if (resetHit) {
-            onUpdateWallLabelOffset(resetHit.id, 0, false);
+            onUpdateWallLabelOffset(resetHit.id, 0, false, 0);
             return;
           }
           const labelHit = hitTestWallMeasurementLabel(
@@ -1188,12 +1188,11 @@ export default function FloorPlanCanvas({
         return;
       }
 
-      // Handle wall measurement label dragging
+      // Handle wall measurement label dragging (free 2D movement)
       if (isDraggingWallLabel && draggingWallLabelId) {
         const wall = state.walls.find(w => w.id === draggingWallLabelId);
         if (wall) {
           const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
-          // Project mouse world position onto wall axis to get offset from midpoint
           const wdx = wall.end.x - wall.start.x;
           const wdy = wall.end.y - wall.start.y;
           const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
@@ -1204,11 +1203,13 @@ export default function FloorPlanCanvas({
             const midY = (wall.start.y + wall.end.y) / 2;
             const relX = world.x - midX;
             const relY = world.y - midY;
+            // Along-wall offset (dot product with wall direction)
             let offsetCm = relX * wallDirX + relY * wallDirY;
-            // Constrain to wall extent (leave 5% margin at each end)
             const maxOffset = wallLen * 0.45;
             offsetCm = Math.max(-maxOffset, Math.min(maxOffset, offsetCm));
-            onUpdateWallLabelOffset(draggingWallLabelId, offsetCm, true);
+            // Perpendicular offset (dot product with wall normal: (-wallDirY, wallDirX))
+            const perpOffsetCm = relX * (-wallDirY) + relY * wallDirX;
+            onUpdateWallLabelOffset(draggingWallLabelId, offsetCm, true, perpOffsetCm);
           }
         }
         return;

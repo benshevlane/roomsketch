@@ -2104,6 +2104,7 @@ export interface WallLabelPositionResult {
   insideNormX: number;
   insideNormY: number;
   perpOffsetPx: number;
+  basePerpOffsetPx: number; // auto-computed perpendicular offset before user override
   flippedSide: boolean;  // true if label moved to opposite side
   wallId: string;        // wall id for identification
   wallStartScreen: Point; // wall start in screen coords
@@ -2207,9 +2208,15 @@ function computeWallLabelPosition(
 
   // Perpendicular offset — always render outside the room boundary
   const dirSign = -1;
-  const perpOffsetPx = dirSign * (wallThicknessPx / 2 + baseFontSize * 0.6 + 8);
+  const basePerpOffsetPx = dirSign * (wallThicknessPx / 2 + baseFontSize * 0.6 + 8);
+  let perpOffsetPx = basePerpOffsetPx;
 
   const pxPerCm = (gridSize && zoom) ? (gridSize * zoom) / 100 : 1;
+
+  // Detect if user has set a 2D perpendicular offset (free-drag)
+  const is2DPinned = wall?.measurementLabelPinned === true
+    && wall.measurementLabelPerpOffset !== undefined
+    && wall.measurementLabelPerpOffset !== 0;
 
   // Check if label is pinned (user-dragged)
   let labelFrac = 0.5;
@@ -2222,12 +2229,13 @@ function computeWallLabelPosition(
     if (wallLenCm > 0) {
       const pinnedFrac = Math.max(0.05, Math.min(0.95, 0.5 + wall.measurementLabelOffset / wallLenCm));
       labelFrac = pinnedFrac;
-      defaultFrac = pinnedFrac;
+      // For 2D-pinned labels, default to wall center so leader line points back there
+      defaultFrac = is2DPinned ? 0.5 : pinnedFrac;
     }
   }
 
-  // Auto-positioning: avoid doors/windows/furniture (runs for both pinned and unpinned labels)
-  if (wall && furniture && gridSize && panOffset) {
+  // Auto-positioning: avoid doors/windows/furniture — skip for 2D-pinned labels (user explicitly placed)
+  if (!is2DPinned && wall && furniture && gridSize && panOffset) {
     const doorOccupants = findComponentsOnWall(wall, furniture, gridSize, zoom, panOffset);
 
     // Also avoid general furniture near label zone
@@ -2272,9 +2280,23 @@ function computeWallLabelPosition(
   // Compute final position
   const mx = sx + (ex - sx) * labelFrac;
   const my = sy + (ey - sy) * labelFrac;
-  const actualPerpOffset = flippedSide ? -perpOffsetPx : perpOffsetPx;
-  const finalX = mx + insideNormX * actualPerpOffset;
-  const finalY = my + insideNormY * actualPerpOffset;
+  let finalX: number;
+  let finalY: number;
+
+  if (is2DPinned) {
+    // Convert stored perp offset (normX/Y convention) to insideNorm direction
+    // normX/Y = raw wall normal (-sin(angle), cos(angle))
+    // insideNormX/Y = ±normX/Y depending on room geometry
+    const perpSign = normX * insideNormX + normY * insideNormY; // +1 or -1
+    perpOffsetPx = wall!.measurementLabelPerpOffset! * pxPerCm * perpSign;
+    finalX = mx + insideNormX * perpOffsetPx;
+    finalY = my + insideNormY * perpOffsetPx;
+  } else {
+    const actualPerpOffset = flippedSide ? -perpOffsetPx : perpOffsetPx;
+    finalX = mx + insideNormX * actualPerpOffset;
+    finalY = my + insideNormY * actualPerpOffset;
+    perpOffsetPx = actualPerpOffset;
+  }
 
   let textAngle = angle;
   if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
@@ -2285,7 +2307,8 @@ function computeWallLabelPosition(
     finalX, finalY, angle, textAngle,
     textWidth, textHeight: textHeight, baseFontSize, text, pad,
     labelFrac, defaultFrac, insideNormX, insideNormY,
-    perpOffsetPx: actualPerpOffset,
+    perpOffsetPx,
+    basePerpOffsetPx,
     flippedSide,
     wallId: wall?.id ?? "",
     wallStartScreen: { x: sx, y: sy },
@@ -2423,11 +2446,15 @@ function drawWallDimensionLabelAtPosition(
   const isPinned = wall?.measurementLabelPinned === true;
 
   // Draw leader line when label moved from default/pinned position
-  if (Math.abs(labelFrac - defaultFrac) > 0.02) {
+  const hasPerpOffset = wall?.measurementLabelPerpOffset != null
+    && Math.abs(wall.measurementLabelPerpOffset) > 1;
+  if (Math.abs(labelFrac - defaultFrac) > 0.02 || hasPerpOffset) {
     const midX = wallStartScreen.x + (wallEndScreen.x - wallStartScreen.x) * defaultFrac;
     const midY = wallStartScreen.y + (wallEndScreen.y - wallStartScreen.y) * defaultFrac;
-    const midLabelX = midX + insideNormX * perpOffsetPx;
-    const midLabelY = midY + insideNormY * perpOffsetPx;
+    // Use base perpendicular offset for leader anchor (auto-computed position, not user offset)
+    const anchorPerpPx = hasPerpOffset ? pos.basePerpOffsetPx : perpOffsetPx;
+    const midLabelX = midX + insideNormX * anchorPerpPx;
+    const midLabelY = midY + insideNormY * anchorPerpPx;
 
     ctx.save();
     ctx.strokeStyle = isDark ? "rgba(79,152,163,0.3)" : "rgba(1,105,111,0.3)";
