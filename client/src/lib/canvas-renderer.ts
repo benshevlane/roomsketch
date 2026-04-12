@@ -1463,7 +1463,8 @@ export function drawWallSegmentMeasurements(
     // In inside mode, segments go on the inside (positive normalSign side).
     // In full mode, segments go on the outside (flip the sign).
     const insideDot = insideNormX * wallNormX + insideNormY * wallNormY;
-    let normalSign = insideDot >= 0 ? 1 : -1;
+    const insideNormalSign = insideDot >= 0 ? 1 : -1; // always points inside, never flipped
+    let normalSign = insideNormalSign;
     if (measureMode === "full") normalSign = -normalSign;
 
     // Compute extensions and half thickness (needed for both paths below)
@@ -1494,8 +1495,9 @@ export function drawWallSegmentMeasurements(
       const iex = ex - dirX * endInset;
       const iey = ey - dirY * endInset;
 
-      // Offset to outside of wall (same side as total dimension line for walls with openings)
-      const offsetDist = -normalSign * (wallThickPx / 2 + 8 * zoom);
+      // Offset to outside of wall — always use insideNormalSign (not mode-flipped)
+      // so the dimension line stays on the exterior face in both inside and full modes
+      const offsetDist = -insideNormalSign * (wallThickPx / 2 + 8 * zoom);
       const normX = -Math.sin(angle);
       const normY = Math.cos(angle);
       const osx = isx + normX * offsetDist;
@@ -1570,7 +1572,7 @@ export function drawWallSegmentMeasurements(
     drawTotalWallDimensionLine(
       ctx, wallStart, wallEnd, displayLengthCm, wallThick,
       pxPerCm, panOffset, zoom, isDark, units, color, measureMode,
-      allOccupants, segStartExt, segEndExt, normalSign, obstacleRects
+      allOccupants, segStartExt, segEndExt, insideNormalSign, obstacleRects
     );
   }
 }

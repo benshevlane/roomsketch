@@ -202,7 +202,7 @@ export default function FloorPlanCanvas({
     startX: number; startY: number;
     endX: number; endY: number;
     mouseWorldX: number; mouseWorldY: number;
-    constraintAxis: "x" | "y";
+    constraintAxis: "x" | "y" | "none";
   } | null>(null);
 
   // Wall measurement label dragging state
@@ -419,10 +419,12 @@ export default function FloorPlanCanvas({
           finalPoint.y - state.wallDrawing.start.y,
           finalPoint.x - state.wallDrawing.start.x
         );
-        // Interior angle: PI - (newWall - adjWall)
+        // Interior angle: PI - (newWall - adjWall), clamped to ≤180°
         let relativeRad = Math.PI - (newWallRad - adjAngleRad);
         let relativeDeg = relativeRad * (180 / Math.PI);
         relativeDeg = ((relativeDeg % 360) + 360) % 360;
+        // Always show the interior (non-reflex) angle
+        if (relativeDeg > 180) relativeDeg = 360 - relativeDeg;
         angleDeg = relativeDeg;
       }
 
@@ -965,7 +967,21 @@ export default function FloorPlanCanvas({
           const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
           const wdx = hitW.end.x - hitW.start.x;
           const wdy = hitW.end.y - hitW.start.y;
-          const constraintAxis = Math.abs(wdx) >= Math.abs(wdy) ? "y" : "x";
+          // Check if this wall is connected to any other wall at either endpoint
+          const WALL_CONNECT_THRESH = 15;
+          const isConnected = state.walls.some(w => {
+            if (w.id === hitW.id) return false;
+            for (const ep of [w.start, w.end]) {
+              for (const hp of [hitW.start, hitW.end]) {
+                if (Math.abs(ep.x - hp.x) < WALL_CONNECT_THRESH && Math.abs(ep.y - hp.y) < WALL_CONNECT_THRESH) return true;
+              }
+            }
+            return false;
+          });
+          // Connected walls: constrain to perpendicular axis; detached walls: free drag
+          const constraintAxis: "x" | "y" | "none" = isConnected
+            ? (Math.abs(wdx) >= Math.abs(wdy) ? "y" : "x")
+            : "none";
           setWallDragStart({
             id: hitW.id,
             startX: hitW.start.x, startY: hitW.start.y,
@@ -1422,13 +1438,14 @@ export default function FloorPlanCanvas({
         let wdx = world.x - wallDragStart.mouseWorldX;
         let wdy = world.y - wallDragStart.mouseWorldY;
         if (wallDragStart.constraintAxis === "y") { wdx = 0; }
-        else { wdy = 0; }
+        else if (wallDragStart.constraintAxis === "x") { wdy = 0; }
+        // constraintAxis === "none": no constraint, both wdx and wdy pass through
         let newStartX = Math.round(wallDragStart.startX + wdx);
         let newStartY = Math.round(wallDragStart.startY + wdy);
-        // Inner-face snap: when inside-measurement mode is active, snap the dragged
-        // wall's endpoint to the inner face of any other nearby wall along the
-        // constraint axis. Pick the smaller snap delta across both endpoints.
-        if (measureMode === "inside") {
+        // Inner-face snap: when inside-measurement mode is active and the wall is
+        // constrained (connected), snap the dragged wall's endpoint to the inner face
+        // of any other nearby wall along the constraint axis.
+        if (measureMode === "inside" && wallDragStart.constraintAxis !== "none") {
           const otherWalls = state.walls.filter(w => w.id !== wallDragStart.id);
           if (otherWalls.length > 0) {
             const movedStart = { x: newStartX, y: newStartY };
@@ -1459,6 +1476,32 @@ export default function FloorPlanCanvas({
             }
           }
         }
+        // Snap-to-connect: for detached walls, snap to nearby wall endpoints
+        if (wallDragStart.constraintAxis === "none") {
+          const SNAP_THRESH = 15;
+          const movedStart = { x: Math.round(wallDragStart.startX + wdx), y: Math.round(wallDragStart.startY + wdy) };
+          const movedEnd = { x: Math.round(wallDragStart.endX + wdx), y: Math.round(wallDragStart.endY + wdy) };
+          let bestSnapDx = 0, bestSnapDy = 0, bestDist = Infinity;
+          for (const w of state.walls) {
+            if (w.id === wallDragStart.id) continue;
+            for (const ep of [w.start, w.end]) {
+              for (const mp of [movedStart, movedEnd]) {
+                const dx = ep.x - mp.x;
+                const dy = ep.y - mp.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < SNAP_THRESH && dist < bestDist) {
+                  bestDist = dist;
+                  bestSnapDx = dx;
+                  bestSnapDy = dy;
+                }
+              }
+            }
+          }
+          if (bestDist < Infinity) {
+            newStartX += bestSnapDx;
+            newStartY += bestSnapDy;
+          }
+        }
         const snappedDx = newStartX - wallDragStart.startX;
         const snappedDy = newStartY - wallDragStart.startY;
         // Move the dragged wall (snap all endpoints to 1cm increments)
@@ -1466,23 +1509,30 @@ export default function FloorPlanCanvas({
           start: { x: Math.round(wallDragStart.startX + snappedDx), y: Math.round(wallDragStart.startY + snappedDy) },
           end: { x: Math.round(wallDragStart.endX + snappedDx), y: Math.round(wallDragStart.endY + snappedDy) },
         });
-        // Stretch connected walls to maintain connectivity
+        // Stretch connected walls to maintain connectivity.
+        // Compare against the dragged wall's CURRENT position in state (previous
+        // frame's state due to React batching), not the original mousedown position.
+        // This prevents connectivity from breaking after dragging >15cm.
         const CONNECT_THRESH = 15;
+        const currentDraggedWall = state.walls.find(w => w.id === wallDragStart.id);
+        const curStart = currentDraggedWall ? currentDraggedWall.start : { x: wallDragStart.startX, y: wallDragStart.startY };
+        const curEnd = currentDraggedWall ? currentDraggedWall.end : { x: wallDragStart.endX, y: wallDragStart.endY };
+        // Target positions are absolute (from drag start + total delta), not relative
+        const newStart = { x: Math.round(wallDragStart.startX + snappedDx), y: Math.round(wallDragStart.startY + snappedDy) };
+        const newEnd = { x: Math.round(wallDragStart.endX + snappedDx), y: Math.round(wallDragStart.endY + snappedDy) };
         state.walls.forEach((w) => {
           if (w.id === wallDragStart.id) return;
-          const origStart = { x: wallDragStart.startX, y: wallDragStart.startY };
-          const origEnd = { x: wallDragStart.endX, y: wallDragStart.endY };
           const updates: Partial<import("../lib/types").Wall> = {};
-          // Check if this wall's start connects to the dragged wall's original start or end
-          if (Math.abs(w.start.x - origStart.x) < CONNECT_THRESH && Math.abs(w.start.y - origStart.y) < CONNECT_THRESH) {
-            updates.start = { x: Math.round(origStart.x + snappedDx), y: Math.round(origStart.y + snappedDy) };
-          } else if (Math.abs(w.start.x - origEnd.x) < CONNECT_THRESH && Math.abs(w.start.y - origEnd.y) < CONNECT_THRESH) {
-            updates.start = { x: Math.round(origEnd.x + snappedDx), y: Math.round(origEnd.y + snappedDy) };
+          // Check if this wall's start connects to the dragged wall's current start or end
+          if (Math.abs(w.start.x - curStart.x) < CONNECT_THRESH && Math.abs(w.start.y - curStart.y) < CONNECT_THRESH) {
+            updates.start = { ...newStart };
+          } else if (Math.abs(w.start.x - curEnd.x) < CONNECT_THRESH && Math.abs(w.start.y - curEnd.y) < CONNECT_THRESH) {
+            updates.start = { ...newEnd };
           }
-          if (Math.abs(w.end.x - origStart.x) < CONNECT_THRESH && Math.abs(w.end.y - origStart.y) < CONNECT_THRESH) {
-            updates.end = { x: Math.round(origStart.x + snappedDx), y: Math.round(origStart.y + snappedDy) };
-          } else if (Math.abs(w.end.x - origEnd.x) < CONNECT_THRESH && Math.abs(w.end.y - origEnd.y) < CONNECT_THRESH) {
-            updates.end = { x: Math.round(origEnd.x + snappedDx), y: Math.round(origEnd.y + snappedDy) };
+          if (Math.abs(w.end.x - curStart.x) < CONNECT_THRESH && Math.abs(w.end.y - curStart.y) < CONNECT_THRESH) {
+            updates.end = { ...newStart };
+          } else if (Math.abs(w.end.x - curEnd.x) < CONNECT_THRESH && Math.abs(w.end.y - curEnd.y) < CONNECT_THRESH) {
+            updates.end = { ...newEnd };
           }
           if (updates.start || updates.end) {
             onMoveWall(w.id, updates);
