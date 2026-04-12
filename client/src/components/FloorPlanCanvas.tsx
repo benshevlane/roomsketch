@@ -104,7 +104,7 @@ interface FloorPlanCanvasProps {
   onSetLabelOffset: (id: string, offset: { x: number; y: number }) => void;
   onSetTool: (tool: EditorTool) => void;
   onSetRoomLabelOffset: (roomKey: string, offset: Point) => void;
-  onUpdateWallLabelOffset: (wallId: string, offset: number, pinned: boolean, perpOffset?: number) => void;
+  onUpdateWallLabelOffset: (wallId: string, position: { x: number; y: number } | null) => void;
   autoEditTextBoxId?: string | null;
   onClearAutoEditTextBox?: () => void;
 }
@@ -209,6 +209,7 @@ export default function FloorPlanCanvas({
   // Wall measurement label dragging state
   const [isDraggingWallLabel, setIsDraggingWallLabel] = useState(false);
   const [draggingWallLabelId, setDraggingWallLabelId] = useState<string | null>(null);
+  const wallLabelDragAnchorRef = useRef<{ dx: number; dy: number } | null>(null);
   const hoveredWallLabelIdRef = useRef<string | null>(null);
   // Cache resolved wall label positions from drawWalls for accurate hit testing
   const resolvedWallLabelPositionsRef = useRef<ResolvedWallLabelPosition[]>([]);
@@ -947,7 +948,7 @@ export default function FloorPlanCanvas({
             resolvedWallLabelPositionsRef.current
           );
           if (resetHit) {
-            onUpdateWallLabelOffset(resetHit.id, 0, false, 0);
+            onUpdateWallLabelOffset(resetHit.id, null);
             return;
           }
           const labelHit = hitTestWallMeasurementLabel(
@@ -957,6 +958,11 @@ export default function FloorPlanCanvas({
           );
           if (labelHit) {
             onPushUndo();
+            // Record pointer-to-label offset for smooth drag (no jump)
+            const resolved = resolvedWallLabelPositionsRef.current?.find(p => p.wallId === labelHit.id);
+            wallLabelDragAnchorRef.current = resolved
+              ? { dx: resolved.pos.finalX - pos.x, dy: resolved.pos.finalY - pos.y }
+              : { dx: 0, dy: 0 };
             setIsDraggingWallLabel(true);
             setDraggingWallLabelId(labelHit.id);
             // Use pointer capture to isolate drag from other interactions
@@ -1190,28 +1196,15 @@ export default function FloorPlanCanvas({
 
       // Handle wall measurement label dragging (free 2D movement)
       if (isDraggingWallLabel && draggingWallLabelId) {
-        const wall = state.walls.find(w => w.id === draggingWallLabelId);
-        if (wall) {
-          const world = screenToWorld(pos.x, pos.y, state.gridSize, state.zoom, state.panOffset);
-          const wdx = wall.end.x - wall.start.x;
-          const wdy = wall.end.y - wall.start.y;
-          const wallLen = Math.sqrt(wdx * wdx + wdy * wdy);
-          if (wallLen > 0) {
-            const wallDirX = wdx / wallLen;
-            const wallDirY = wdy / wallLen;
-            const midX = (wall.start.x + wall.end.x) / 2;
-            const midY = (wall.start.y + wall.end.y) / 2;
-            const relX = world.x - midX;
-            const relY = world.y - midY;
-            // Along-wall offset (dot product with wall direction)
-            let offsetCm = relX * wallDirX + relY * wallDirY;
-            const maxOffset = wallLen * 0.45;
-            offsetCm = Math.max(-maxOffset, Math.min(maxOffset, offsetCm));
-            // Perpendicular offset (dot product with wall normal: (-wallDirY, wallDirX))
-            const perpOffsetCm = relX * (-wallDirY) + relY * wallDirX;
-            onUpdateWallLabelOffset(draggingWallLabelId, offsetCm, true, perpOffsetCm);
-          }
-        }
+        const anchor = wallLabelDragAnchorRef.current ?? { dx: 0, dy: 0 };
+        // Compute label screen position from pointer + anchor offset
+        const labelScreenX = pos.x + anchor.dx;
+        const labelScreenY = pos.y + anchor.dy;
+        // Convert to world coordinates directly — no projection, no axis clamping
+        const pxPerCm = (state.gridSize * state.zoom) / 100;
+        const worldX = (labelScreenX - state.panOffset.x) / pxPerCm;
+        const worldY = (labelScreenY - state.panOffset.y) / pxPerCm;
+        onUpdateWallLabelOffset(draggingWallLabelId, { x: worldX, y: worldY });
         return;
       }
 

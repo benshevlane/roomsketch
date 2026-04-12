@@ -1039,14 +1039,22 @@ function resolveWallLabelCollisions(
           a.top < b.bottom && a.bottom > b.top;
         if (overlaps) {
           if (preferShorter) {
-            // Shift whichever label is on the shorter wall.
+            // Shift whichever label is on the shorter wall (skip user-pinned labels).
             const shorter = infos[i].lengthCm <= infos[j].lengthCm ? i : j;
-            shiftWallLabelPerpendicular(infos[shorter].pos, stepPx);
+            if (!infos[shorter].pos.pinnedAbsolute) {
+              shiftWallLabelPerpendicular(infos[shorter].pos, stepPx);
+              moved = true;
+            }
           } else {
-            shiftWallLabelPerpendicular(infos[i].pos, stepPx);
-            shiftWallLabelPerpendicular(infos[j].pos, stepPx);
+            if (!infos[i].pos.pinnedAbsolute) {
+              shiftWallLabelPerpendicular(infos[i].pos, stepPx);
+              moved = true;
+            }
+            if (!infos[j].pos.pinnedAbsolute) {
+              shiftWallLabelPerpendicular(infos[j].pos, stepPx);
+              moved = true;
+            }
           }
-          moved = true;
         }
       }
     }
@@ -2104,8 +2112,9 @@ export interface WallLabelPositionResult {
   insideNormX: number;
   insideNormY: number;
   perpOffsetPx: number;
-  basePerpOffsetPx: number; // auto-computed perpendicular offset before user override
+  basePerpOffsetPx: number; // auto-computed perpendicular offset (for leader line anchor)
   flippedSide: boolean;  // true if label moved to opposite side
+  pinnedAbsolute: boolean; // true if user has pinned with absolute world position
   wallId: string;        // wall id for identification
   wallStartScreen: Point; // wall start in screen coords
   wallEndScreen: Point;   // wall end in screen coords
@@ -2213,29 +2222,51 @@ function computeWallLabelPosition(
 
   const pxPerCm = (gridSize && zoom) ? (gridSize * zoom) / 100 : 1;
 
-  // Detect if user has set a 2D perpendicular offset (free-drag)
-  const is2DPinned = wall?.measurementLabelPinned === true
-    && wall.measurementLabelPerpOffset !== undefined
-    && wall.measurementLabelPerpOffset !== 0;
+  // Check if label has an absolute user-placed position (free 2D drag)
+  const hasAbsolutePos = wall?.measurementLabelPinned === true
+    && wall.measurementLabelPosition != null;
 
   // Check if label is pinned (user-dragged)
   let labelFrac = 0.5;
   let flippedSide = false;
   let defaultFrac = 0.5;
 
-  // If pinned, compute the user's chosen fraction and use it as the starting point
+  if (hasAbsolutePos) {
+    // Absolute position: convert world → screen directly
+    const finalX = wall!.measurementLabelPosition!.x * pxPerCm + (panOffset?.x ?? 0);
+    const finalY = wall!.measurementLabelPosition!.y * pxPerCm + (panOffset?.y ?? 0);
+
+    let textAngle = angle;
+    if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
+      textAngle += Math.PI;
+    }
+
+    return {
+      finalX, finalY, angle, textAngle,
+      textWidth, textHeight, baseFontSize, text, pad,
+      labelFrac: 0.5, defaultFrac: 0.5, insideNormX, insideNormY,
+      perpOffsetPx: basePerpOffsetPx,
+      basePerpOffsetPx,
+      flippedSide: false,
+      pinnedAbsolute: true,
+      wallId: wall?.id ?? "",
+      wallStartScreen: { x: sx, y: sy },
+      wallEndScreen: { x: ex, y: ey },
+    };
+  }
+
+  // Legacy: if pinned with old offset (no absolute position), compute fraction
   if (wall?.measurementLabelPinned && wall.measurementLabelOffset !== undefined) {
     const wallLenCm = Math.sqrt((wall.end.x - wall.start.x) ** 2 + (wall.end.y - wall.start.y) ** 2);
     if (wallLenCm > 0) {
       const pinnedFrac = Math.max(0.05, Math.min(0.95, 0.5 + wall.measurementLabelOffset / wallLenCm));
       labelFrac = pinnedFrac;
-      // For 2D-pinned labels, default to wall center so leader line points back there
-      defaultFrac = is2DPinned ? 0.5 : pinnedFrac;
+      defaultFrac = pinnedFrac;
     }
   }
 
-  // Auto-positioning: avoid doors/windows/furniture — skip for 2D-pinned labels (user explicitly placed)
-  if (!is2DPinned && wall && furniture && gridSize && panOffset) {
+  // Auto-positioning: avoid doors/windows/furniture
+  if (wall && furniture && gridSize && panOffset) {
     const doorOccupants = findComponentsOnWall(wall, furniture, gridSize, zoom, panOffset);
 
     // Also avoid general furniture near label zone
@@ -2280,23 +2311,10 @@ function computeWallLabelPosition(
   // Compute final position
   const mx = sx + (ex - sx) * labelFrac;
   const my = sy + (ey - sy) * labelFrac;
-  let finalX: number;
-  let finalY: number;
-
-  if (is2DPinned) {
-    // Convert stored perp offset (normX/Y convention) to insideNorm direction
-    // normX/Y = raw wall normal (-sin(angle), cos(angle))
-    // insideNormX/Y = ±normX/Y depending on room geometry
-    const perpSign = normX * insideNormX + normY * insideNormY; // +1 or -1
-    perpOffsetPx = wall!.measurementLabelPerpOffset! * pxPerCm * perpSign;
-    finalX = mx + insideNormX * perpOffsetPx;
-    finalY = my + insideNormY * perpOffsetPx;
-  } else {
-    const actualPerpOffset = flippedSide ? -perpOffsetPx : perpOffsetPx;
-    finalX = mx + insideNormX * actualPerpOffset;
-    finalY = my + insideNormY * actualPerpOffset;
-    perpOffsetPx = actualPerpOffset;
-  }
+  const actualPerpOffset = flippedSide ? -perpOffsetPx : perpOffsetPx;
+  const finalX = mx + insideNormX * actualPerpOffset;
+  const finalY = my + insideNormY * actualPerpOffset;
+  perpOffsetPx = actualPerpOffset;
 
   let textAngle = angle;
   if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
@@ -2305,11 +2323,12 @@ function computeWallLabelPosition(
 
   return {
     finalX, finalY, angle, textAngle,
-    textWidth, textHeight: textHeight, baseFontSize, text, pad,
+    textWidth, textHeight, baseFontSize, text, pad,
     labelFrac, defaultFrac, insideNormX, insideNormY,
     perpOffsetPx,
     basePerpOffsetPx,
     flippedSide,
+    pinnedAbsolute: false,
     wallId: wall?.id ?? "",
     wallStartScreen: { x: sx, y: sy },
     wallEndScreen: { x: ex, y: ey },
@@ -2445,16 +2464,17 @@ function drawWallDimensionLabelAtPosition(
   const isHovered = wall?.id != null && hoveredWallLabelId === wall.id;
   const isPinned = wall?.measurementLabelPinned === true;
 
-  // Draw leader line when label moved from default/pinned position
-  const hasPerpOffset = wall?.measurementLabelPerpOffset != null
-    && Math.abs(wall.measurementLabelPerpOffset) > 1;
-  if (Math.abs(labelFrac - defaultFrac) > 0.02 || hasPerpOffset) {
-    const midX = wallStartScreen.x + (wallEndScreen.x - wallStartScreen.x) * defaultFrac;
-    const midY = wallStartScreen.y + (wallEndScreen.y - wallStartScreen.y) * defaultFrac;
-    // Use base perpendicular offset for leader anchor (auto-computed position, not user offset)
-    const anchorPerpPx = hasPerpOffset ? pos.basePerpOffsetPx : perpOffsetPx;
-    const midLabelX = midX + insideNormX * anchorPerpPx;
-    const midLabelY = midY + insideNormY * anchorPerpPx;
+  // Draw leader line when label moved from default position
+  const isAbsolute = pos.pinnedAbsolute;
+  const showLeader = isAbsolute
+    ? true  // Always show leader for absolutely-positioned labels
+    : Math.abs(labelFrac - defaultFrac) > 0.02;
+  if (showLeader) {
+    // Anchor = wall midpoint at auto-computed perpendicular offset
+    const midX = (wallStartScreen.x + wallEndScreen.x) / 2;
+    const midY = (wallStartScreen.y + wallEndScreen.y) / 2;
+    const midLabelX = midX + insideNormX * pos.basePerpOffsetPx;
+    const midLabelY = midY + insideNormY * pos.basePerpOffsetPx;
 
     ctx.save();
     ctx.strokeStyle = isDark ? "rgba(79,152,163,0.3)" : "rgba(1,105,111,0.3)";
