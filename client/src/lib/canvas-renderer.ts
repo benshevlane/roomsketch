@@ -849,11 +849,11 @@ export function drawWalls(
   // Decide the per-wall label mode given the current display options. The
   // hover cluster overrides showAll for that subset of walls — a wall in the
   // cluster always renders with the brighter hover pill.
-  const resolveLabelMode = (wallId: string, lengthCm: number): "default" | "showAll" | "hover" | "hidden" => {
+  const resolveLabelMode = (wallId: string, lengthCm: number): "default" | "showAll" | "hover" => {
     if (labelDisplay.hoveredClusterIds && labelDisplay.hoveredClusterIds.has(wallId)) return "hover";
     if (labelDisplay.showAll) return "showAll";
     if (lengthCm >= DEFAULT_WALL_LABEL_MIN_CM) return "default";
-    return "hidden";
+    return "showAll"; // short walls always visible with compact font sizing
   };
 
   // Collect label positions first (two-pass), then collision-resolve so that
@@ -884,7 +884,6 @@ export function drawWalls(
       ? Math.max(0, lengthCm - wallThick)
       : lengthCm;
     const mode = resolveLabelMode(wall.id, displayLengthCmRaw);
-    if (mode === "hidden") return;
 
     const { startExtension, endExtension } = measureMode === "full"
       ? getEndpointExtensions(wall.start, wall.end, wallThick, walls)
@@ -921,7 +920,7 @@ export function drawWalls(
       : group.totalLengthCm;
     // A group inherits hover if any of its constituent walls are in the
     // hovered cluster, else follows showAll / default visibility.
-    let groupMode: "default" | "showAll" | "hover" | "hidden";
+    let groupMode: "default" | "showAll" | "hover";
     if (labelDisplay.hoveredClusterIds) {
       let anyHover = false;
       for (const id of group.wallIds) {
@@ -929,13 +928,12 @@ export function drawWalls(
       }
       if (anyHover) groupMode = "hover";
       else if (labelDisplay.showAll) groupMode = "showAll";
-      else groupMode = groupTotalDisplayCm >= DEFAULT_WALL_LABEL_MIN_CM ? "default" : "hidden";
+      else groupMode = groupTotalDisplayCm >= DEFAULT_WALL_LABEL_MIN_CM ? "default" : "showAll";
     } else if (labelDisplay.showAll) {
       groupMode = "showAll";
     } else {
-      groupMode = groupTotalDisplayCm >= DEFAULT_WALL_LABEL_MIN_CM ? "default" : "hidden";
+      groupMode = groupTotalDisplayCm >= DEFAULT_WALL_LABEL_MIN_CM ? "default" : "showAll";
     }
-    if (groupMode === "hidden") continue;
 
     const { startExtension, endExtension } = measureMode === "full"
       ? getEndpointExtensions(group.minP, group.maxP, thickness, walls)
@@ -967,7 +965,7 @@ export function drawWalls(
   // offset of overlapping labels. Short-wall labels on a corner (e.g. 0.04m + 0.16m)
   // would otherwise stack on top of each other. "Show all" uses 4 px steps and
   // shifts only the shorter wall's label so long-wall labels stay near midpoint.
-  const useShowAllCollisionPolicy = labelDisplay.showAll && !labelDisplay.hoveredClusterIds;
+  const useShowAllCollisionPolicy = !labelDisplay.hoveredClusterIds;
   resolveWallLabelCollisions(
     labelInfos.map(({ pos, lengthCm }) => ({ pos, lengthCm })),
     useShowAllCollisionPolicy ? 4 : 8,

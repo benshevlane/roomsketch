@@ -365,7 +365,7 @@ export default function FloorPlanCanvas({
     // "Show all measurements" toggle or hover cluster mode is already
     // surfacing short-wall labels — the "+N hidden" badge would then be
     // misleading and can stack on top of the new tooltip pills.
-    const suppressDiscrepancy = showAllMeasurements || hoveredClusterIds !== null;
+    const suppressDiscrepancy = true; // all labels always rendered by drawWalls — discrepancy path would duplicate
     if (!suppressDiscrepancy && (flaggedWalls.size > 0 || state.zoom < 0.6)) {
       drawWallLabelsWithDiscrepancy(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode, state.furniture, flaggedWalls, w, h);
     }
