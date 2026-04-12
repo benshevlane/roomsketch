@@ -2104,6 +2104,7 @@ export interface WallLabelPositionResult {
   insideNormX: number;
   insideNormY: number;
   perpOffsetPx: number;
+  basePerpOffsetPx: number; // auto-computed perpendicular offset before user override
   flippedSide: boolean;  // true if label moved to opposite side
   wallId: string;        // wall id for identification
   wallStartScreen: Point; // wall start in screen coords
@@ -2207,9 +2208,15 @@ function computeWallLabelPosition(
 
   // Perpendicular offset — always render outside the room boundary
   const dirSign = -1;
-  const perpOffsetPx = dirSign * (wallThicknessPx / 2 + baseFontSize * 0.6 + 8);
+  const basePerpOffsetPx = dirSign * (wallThicknessPx / 2 + baseFontSize * 0.6 + 8);
+  let perpOffsetPx = basePerpOffsetPx;
 
   const pxPerCm = (gridSize && zoom) ? (gridSize * zoom) / 100 : 1;
+
+  // Detect if user has set a 2D perpendicular offset (free-drag)
+  const is2DPinned = wall?.measurementLabelPinned === true
+    && wall.measurementLabelPerpOffset !== undefined
+    && wall.measurementLabelPerpOffset !== 0;
 
   // Check if label is pinned (user-dragged)
   let labelFrac = 0.5;
@@ -2222,12 +2229,13 @@ function computeWallLabelPosition(
     if (wallLenCm > 0) {
       const pinnedFrac = Math.max(0.05, Math.min(0.95, 0.5 + wall.measurementLabelOffset / wallLenCm));
       labelFrac = pinnedFrac;
-      defaultFrac = pinnedFrac;
+      // For 2D-pinned labels, default to wall center so leader line points back there
+      defaultFrac = is2DPinned ? 0.5 : pinnedFrac;
     }
   }
 
-  // Auto-positioning: avoid doors/windows/furniture (runs for both pinned and unpinned labels)
-  if (wall && furniture && gridSize && panOffset) {
+  // Auto-positioning: avoid doors/windows/furniture — skip for 2D-pinned labels (user explicitly placed)
+  if (!is2DPinned && wall && furniture && gridSize && panOffset) {
     const doorOccupants = findComponentsOnWall(wall, furniture, gridSize, zoom, panOffset);
 
     // Also avoid general furniture near label zone
@@ -2272,9 +2280,23 @@ function computeWallLabelPosition(
   // Compute final position
   const mx = sx + (ex - sx) * labelFrac;
   const my = sy + (ey - sy) * labelFrac;
-  const actualPerpOffset = flippedSide ? -perpOffsetPx : perpOffsetPx;
-  const finalX = mx + insideNormX * actualPerpOffset;
-  const finalY = my + insideNormY * actualPerpOffset;
+  let finalX: number;
+  let finalY: number;
+
+  if (is2DPinned) {
+    // Convert stored perp offset (normX/Y convention) to insideNorm direction
+    // normX/Y = raw wall normal (-sin(angle), cos(angle))
+    // insideNormX/Y = ±normX/Y depending on room geometry
+    const perpSign = normX * insideNormX + normY * insideNormY; // +1 or -1
+    perpOffsetPx = wall!.measurementLabelPerpOffset! * pxPerCm * perpSign;
+    finalX = mx + insideNormX * perpOffsetPx;
+    finalY = my + insideNormY * perpOffsetPx;
+  } else {
+    const actualPerpOffset = flippedSide ? -perpOffsetPx : perpOffsetPx;
+    finalX = mx + insideNormX * actualPerpOffset;
+    finalY = my + insideNormY * actualPerpOffset;
+    perpOffsetPx = actualPerpOffset;
+  }
 
   let textAngle = angle;
   if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
@@ -2285,7 +2307,8 @@ function computeWallLabelPosition(
     finalX, finalY, angle, textAngle,
     textWidth, textHeight: textHeight, baseFontSize, text, pad,
     labelFrac, defaultFrac, insideNormX, insideNormY,
-    perpOffsetPx: actualPerpOffset,
+    perpOffsetPx,
+    basePerpOffsetPx,
     flippedSide,
     wallId: wall?.id ?? "",
     wallStartScreen: { x: sx, y: sy },
@@ -2423,11 +2446,15 @@ function drawWallDimensionLabelAtPosition(
   const isPinned = wall?.measurementLabelPinned === true;
 
   // Draw leader line when label moved from default/pinned position
-  if (Math.abs(labelFrac - defaultFrac) > 0.02) {
+  const hasPerpOffset = wall?.measurementLabelPerpOffset != null
+    && Math.abs(wall.measurementLabelPerpOffset) > 1;
+  if (Math.abs(labelFrac - defaultFrac) > 0.02 || hasPerpOffset) {
     const midX = wallStartScreen.x + (wallEndScreen.x - wallStartScreen.x) * defaultFrac;
     const midY = wallStartScreen.y + (wallEndScreen.y - wallStartScreen.y) * defaultFrac;
-    const midLabelX = midX + insideNormX * perpOffsetPx;
-    const midLabelY = midY + insideNormY * perpOffsetPx;
+    // Use base perpendicular offset for leader anchor (auto-computed position, not user offset)
+    const anchorPerpPx = hasPerpOffset ? pos.basePerpOffsetPx : perpOffsetPx;
+    const midLabelX = midX + insideNormX * anchorPerpPx;
+    const midLabelY = midY + insideNormY * anchorPerpPx;
 
     ctx.save();
     ctx.strokeStyle = isDark ? "rgba(79,152,163,0.3)" : "rgba(1,105,111,0.3)";
@@ -5973,6 +6000,12 @@ export function snapFurnitureToWalls(
   let didSnap = false;
   let snappedWallThickness: number | undefined;
   const snappedEdges: SnappedWallEdge[] = [];
+  // Track whether each axis has been snapped by a wall-face snap.
+  // Face snaps (perpendicular to wall) take priority over endpoint snaps
+  // (along wall) to prevent corner conflicts where an endpoint snap from
+  // one wall overrides the face snap from an adjoining wall.
+  let xSnappedByFace = false;
+  let ySnappedByFace = false;
 
   // Use AABB for rotated items
   const aabb = getFurnitureAABB(item);
@@ -6004,29 +6037,25 @@ export function snapFurnitureToWalls(
       if (bb.right > wallMinX && bb.left < wallMaxX) {
         const wallTopEdge = wallY - halfThick;
         const wallBottomEdge = wallY + halfThick;
-        // Find closest Y edge to snap to (pick nearest)
+        // Find closest Y edge to snap to — only flush (outside) candidates
         const candidates: { dist: number; newY: number; edgeCoord: number }[] = [];
-        // Snap furniture bottom to wall top edge
+        // Snap furniture bottom to wall top edge (furniture above wall, flush)
         const d1 = Math.abs(bb.bottom - wallTopEdge);
         if (d1 < threshold) candidates.push({ dist: d1, newY: wallTopEdge - aabbH - aabbOffY, edgeCoord: wallTopEdge });
-        // Snap furniture top to wall bottom edge
+        // Snap furniture top to wall bottom edge (furniture below wall, flush)
         const d2 = Math.abs(bb.top - wallBottomEdge);
         if (d2 < threshold) candidates.push({ dist: d2, newY: wallBottomEdge - aabbOffY, edgeCoord: wallBottomEdge });
-        // Snap furniture top to wall top edge
-        const d3 = Math.abs(bb.top - wallTopEdge);
-        if (d3 < threshold) candidates.push({ dist: d3, newY: wallTopEdge - aabbOffY, edgeCoord: wallTopEdge });
-        // Snap furniture bottom to wall bottom edge
-        const d4 = Math.abs(bb.bottom - wallBottomEdge);
-        if (d4 < threshold) candidates.push({ dist: d4, newY: wallBottomEdge - aabbH - aabbOffY, edgeCoord: wallBottomEdge });
         if (candidates.length > 0) {
           candidates.sort((a, b) => a.dist - b.dist);
           y = candidates[0].newY;
           didSnap = true; snappedWallThickness = wallThick;
+          ySnappedByFace = true;
           snappedEdges.push({ wall, axis: 'y', edgeCoord: candidates[0].edgeCoord, segStart: wallMinX, segEnd: wallMaxX });
         }
       }
       // Snap furniture edges to wall endpoints (horizontal alignment)
-      if (bb.bottom > wallY - halfThick - threshold && bb.top < wallY + halfThick + threshold) {
+      // Skip if X axis was already face-snapped by a perpendicular wall
+      if (!xSnappedByFace && bb.bottom > wallY - halfThick - threshold && bb.top < wallY + halfThick + threshold) {
         // Left edge to wall left end
         if (Math.abs(bb.left - wallMinX) < threshold) {
           x = wallMinX - aabbOffX;
@@ -6048,29 +6077,25 @@ export function snapFurnitureToWalls(
       if (bb.bottom > wallMinY && bb.top < wallMaxY) {
         const wallLeftEdge = wallX - halfThick;
         const wallRightEdge = wallX + halfThick;
-        // Find closest X edge to snap to (pick nearest)
+        // Find closest X edge to snap to — only flush (outside) candidates
         const candidates: { dist: number; newX: number; edgeCoord: number }[] = [];
-        // Snap furniture right to wall left edge
+        // Snap furniture right to wall left edge (furniture left of wall, flush)
         const d1 = Math.abs(bb.right - wallLeftEdge);
         if (d1 < threshold) candidates.push({ dist: d1, newX: wallLeftEdge - aabbW - aabbOffX, edgeCoord: wallLeftEdge });
-        // Snap furniture left to wall right edge
+        // Snap furniture left to wall right edge (furniture right of wall, flush)
         const d2 = Math.abs(bb.left - wallRightEdge);
         if (d2 < threshold) candidates.push({ dist: d2, newX: wallRightEdge - aabbOffX, edgeCoord: wallRightEdge });
-        // Snap furniture left to wall left edge
-        const d3 = Math.abs(bb.left - wallLeftEdge);
-        if (d3 < threshold) candidates.push({ dist: d3, newX: wallLeftEdge - aabbOffX, edgeCoord: wallLeftEdge });
-        // Snap furniture right to wall right edge
-        const d4 = Math.abs(bb.right - wallRightEdge);
-        if (d4 < threshold) candidates.push({ dist: d4, newX: wallRightEdge - aabbW - aabbOffX, edgeCoord: wallRightEdge });
         if (candidates.length > 0) {
           candidates.sort((a, b) => a.dist - b.dist);
           x = candidates[0].newX;
           didSnap = true; snappedWallThickness = wallThick;
+          xSnappedByFace = true;
           snappedEdges.push({ wall, axis: 'x', edgeCoord: candidates[0].edgeCoord, segStart: wallMinY, segEnd: wallMaxY });
         }
       }
       // Snap furniture edges to wall endpoints (vertical alignment)
-      if (bb.right > wallX - halfThick - threshold && bb.left < wallX + halfThick + threshold) {
+      // Skip if Y axis was already face-snapped by a perpendicular wall
+      if (!ySnappedByFace && bb.right > wallX - halfThick - threshold && bb.left < wallX + halfThick + threshold) {
         // Top edge to wall top end
         if (Math.abs(bb.top - wallMinY) < threshold) {
           y = wallMinY - aabbOffY;
@@ -6083,6 +6108,12 @@ export function snapFurnitureToWalls(
         }
       }
     }
+
+    // Update bb after each wall so subsequent walls use the snapped position
+    bb.left = x + aabbOffX;
+    bb.right = x + aabbOffX + aabbW;
+    bb.top = y + aabbOffY;
+    bb.bottom = y + aabbOffY + aabbH;
   }
 
   return { x, y, didSnap, snappedWallThickness, snappedEdges };

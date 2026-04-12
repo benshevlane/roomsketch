@@ -582,11 +582,12 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
   }, []);
 
   /** Update wall measurement label offset — cosmetic preference, NOT added to undo stack */
-  const updateWallLabelOffset = useCallback((id: string, offset: number, pinned: boolean) => {
+  const updateWallLabelOffset = useCallback((id: string, offset: number, pinned: boolean, perpOffset?: number) => {
     setState((s) => ({
       ...s,
       walls: s.walls.map((w) => w.id === id
-        ? { ...w, measurementLabelOffset: offset, measurementLabelPinned: pinned }
+        ? { ...w, measurementLabelOffset: offset, measurementLabelPinned: pinned,
+            measurementLabelPerpOffset: perpOffset ?? 0 }
         : w),
     }));
   }, []);
