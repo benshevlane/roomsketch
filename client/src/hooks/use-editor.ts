@@ -338,7 +338,13 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
   const moveWall = useCallback((id: string, updates: Partial<Wall>) => {
     setState((s) => ({
       ...s,
-      walls: s.walls.map((w) => w.id === id ? { ...w, ...updates } : w),
+      walls: s.walls.map((w) => w.id === id
+        ? { ...w, ...updates,
+            // Clear pinned label position when wall geometry changes
+            measurementLabelPosition: undefined,
+            measurementLabelPinned: false,
+            measurementLabelOffset: undefined }
+        : w),
     }));
   }, []);
 
@@ -581,13 +587,16 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     setState((s) => ({ ...s, componentLabelsVisible: !s.componentLabelsVisible }));
   }, []);
 
-  /** Update wall measurement label offset — cosmetic preference, NOT added to undo stack */
-  const updateWallLabelOffset = useCallback((id: string, offset: number, pinned: boolean, perpOffset?: number) => {
+  /** Update wall measurement label position — cosmetic preference, NOT added to undo stack.
+   *  Pass null position to reset to auto-computed default. */
+  const updateWallLabelOffset = useCallback((id: string, position: { x: number; y: number } | null) => {
     setState((s) => ({
       ...s,
       walls: s.walls.map((w) => w.id === id
-        ? { ...w, measurementLabelOffset: offset, measurementLabelPinned: pinned,
-            measurementLabelPerpOffset: perpOffset ?? 0 }
+        ? position
+          ? { ...w, measurementLabelPosition: position, measurementLabelPinned: true }
+          : { ...w, measurementLabelPosition: undefined, measurementLabelPinned: false,
+              measurementLabelOffset: undefined }
         : w),
     }));
   }, []);

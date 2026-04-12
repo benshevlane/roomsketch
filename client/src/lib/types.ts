@@ -13,9 +13,9 @@ export interface Wall {
   end: Point;
   thickness: number; // in cm
   wallType?: WallType; // defaults to "exterior" (30cm) when creating new walls
-  measurementLabelOffset?: number;    // cm along wall axis from midpoint (positive = toward end)
-  measurementLabelPerpOffset?: number; // cm perpendicular from wall axis (convention: (-wallDirY, wallDirX))
-  measurementLabelPinned?: boolean;   // true = user manually dragged, skip auto-positioning
+  measurementLabelOffset?: number;    // legacy: cm along wall axis from midpoint
+  measurementLabelPinned?: boolean;   // true = user manually dragged
+  measurementLabelPosition?: { x: number; y: number }; // absolute world-space position (cm) — overrides offset when set
 }
 
 export interface FurnitureItem {
