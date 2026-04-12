@@ -365,7 +365,7 @@ export default function FloorPlanCanvas({
     // "Show all measurements" toggle or hover cluster mode is already
     // surfacing short-wall labels — the "+N hidden" badge would then be
     // misleading and can stack on top of the new tooltip pills.
-    const suppressDiscrepancy = showAllMeasurements || hoveredClusterIds !== null;
+    const suppressDiscrepancy = true; // all labels always rendered by drawWalls — discrepancy path would duplicate
     if (!suppressDiscrepancy && (flaggedWalls.size > 0 || state.zoom < 0.6)) {
       drawWallLabelsWithDiscrepancy(ctx, state.walls, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode, state.furniture, flaggedWalls, w, h);
     }
@@ -2081,8 +2081,8 @@ export default function FloorPlanCanvas({
     onUpdateTextBox(id, { content: html });
   }, [onUpdateTextBox]);
 
-  const handleTextBoxResizeHeight = useCallback((id: string, newHeightCm: number) => {
-    onUpdateTextBox(id, { height: newHeightCm });
+  const handleTextBoxAutoFit = useCallback((id: string, widthCm: number, heightCm: number) => {
+    onUpdateTextBox(id, { width: widthCm, height: heightCm });
   }, [onUpdateTextBox]);
 
   const handleTextBoxStartResize = useCallback((id: string, corner: string, e: React.PointerEvent) => {
@@ -2292,7 +2292,8 @@ export default function FloorPlanCanvas({
     if (state.selectedTool === "select") {
       if (isDragging) return "grabbing";
       if (emptyCanvasDragStart.current) return "grabbing";
-      // Unified: ANY hovered element → pointer cursor, empty canvas → grab/pan
+      // Wall labels and room labels get grab cursor; other hovered elements get pointer
+      if (selectHoverElement?.kind === "wallLabel" || selectHoverElement?.kind === "roomLabel") return "grab";
       if (selectHoverElement) return "default";
       return "grab";
     }
@@ -2340,7 +2341,7 @@ export default function FloorPlanCanvas({
           onContentChange={handleTextBoxContentChange}
           onStartResize={handleTextBoxStartResize}
           onStartRotate={handleTextBoxStartRotate}
-          onResizeHeight={handleTextBoxResizeHeight}
+          onAutoFit={handleTextBoxAutoFit}
         />
       ))}
       {/* Inline label editing overlay */}

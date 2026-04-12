@@ -17,7 +17,7 @@ interface RichTextBoxProps {
   onContentChange: (id: string, html: string) => void;
   onStartResize: (id: string, corner: string, e: React.PointerEvent) => void;
   onStartRotate: (id: string, e: React.PointerEvent) => void;
-  onResizeHeight: (id: string, newHeightCm: number) => void;
+  onAutoFit: (id: string, widthCm: number, heightCm: number) => void;
 }
 
 const RESIZE_HANDLE_SIZE = 8;
@@ -37,7 +37,7 @@ export default function RichTextBox({
   onContentChange,
   onStartResize,
   onStartRotate,
-  onResizeHeight,
+  onAutoFit,
 }: RichTextBoxProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
@@ -73,18 +73,35 @@ export default function RichTextBox({
   }, [isEditMode]);
 
   const handleInput = useCallback(() => {
-    if (contentRef.current) {
-      onContentChange(textBox.id, contentRef.current.innerHTML);
-      // Auto-resize height to fit content
-      const el = contentRef.current.parentElement;
-      if (el) {
-        const newHeightCm = el.scrollHeight / pxPerCm;
-        if (newHeightCm > textBox.height) {
-          onResizeHeight(textBox.id, newHeightCm);
-        }
-      }
-    }
-  }, [textBox.id, textBox.height, pxPerCm, onContentChange, onResizeHeight]);
+    if (!contentRef.current) return;
+    onContentChange(textBox.id, contentRef.current.innerHTML);
+
+    // Auto-fit box dimensions to content
+    const parent = contentRef.current.parentElement;
+    if (!parent) return;
+
+    const savedW = parent.style.width;
+    const savedMinH = parent.style.minHeight;
+
+    // Measure natural (unwrapped) content width
+    parent.style.width = 'max-content';
+    parent.style.minHeight = '0px';
+    const naturalW = parent.offsetWidth;
+
+    // Set width to min(current, natural), then measure height at that width
+    const minW = 60 * pxPerCm; // minimum 60cm
+    const targetW = Math.min(screenW, Math.max(minW, naturalW));
+    parent.style.width = targetW + 'px';
+    const naturalH = parent.scrollHeight;
+
+    // Restore original styles before React re-renders
+    parent.style.width = savedW;
+    parent.style.minHeight = savedMinH;
+
+    const newWidthCm = Math.max(20, targetW / pxPerCm);
+    const newHeightCm = Math.max(20, naturalH / pxPerCm);
+    onAutoFit(textBox.id, newWidthCm, newHeightCm);
+  }, [textBox.id, screenW, pxPerCm, onContentChange, onAutoFit]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {

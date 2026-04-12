@@ -432,7 +432,7 @@ export default function EditorToolbar({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{showAllMeasurements ? "Hide labels for walls under 1 m" : "Show all wall measurements (including short walls)"}</p>
+            <p>{showAllMeasurements ? "Using full-size labels for all walls" : "Enlarge labels for short walls"}</p>
           </TooltipContent>
         </Tooltip>
         <DropdownMenu>
