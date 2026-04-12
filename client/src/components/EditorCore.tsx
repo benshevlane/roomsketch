@@ -183,31 +183,21 @@ export default function EditorCore({
 
   const handleDuplicate = useCallback(() => {
     if (selectedFurniture) {
+      // Full clone — preserves rotation, mirrored, customName, heightFromFloor, etc.
+      editor.duplicateFurniture(selectedFurniture);
       clipboardRef.current = { type: "furniture", data: { ...selectedFurniture } };
-    } else if (selectedLabel) {
+      return;
+    }
+    if (selectedLabel) {
       clipboardRef.current = { type: "label", data: { ...selectedLabel } };
     } else if (selectedTextBox) {
       clipboardRef.current = { type: "textbox", data: { ...selectedTextBox } };
     } else if (selectedArrow) {
       clipboardRef.current = { type: "arrow", data: { ...selectedArrow } };
     }
-    // Then paste immediately
     const clip = clipboardRef.current;
     if (!clip) return;
-    if (clip.type === "furniture") {
-      const template: FurnitureTemplate = {
-        type: clip.data.type,
-        label: (clip.data as FurnitureItem).label,
-        width: (clip.data as FurnitureItem).width,
-        height: (clip.data as FurnitureItem).height,
-        category: (clip.data as FurnitureItem).category,
-        icon: "",
-      };
-      editor.addFurniture(template, {
-        x: (clip.data as FurnitureItem).x + (clip.data as FurnitureItem).width / 2 + 20,
-        y: (clip.data as FurnitureItem).y + (clip.data as FurnitureItem).height / 2 + 20,
-      });
-    } else if (clip.type === "label") {
+    if (clip.type === "label") {
       editor.addLabel((clip.data as RoomLabel).text, {
         x: (clip.data as RoomLabel).x + 20,
         y: (clip.data as RoomLabel).y + 20,

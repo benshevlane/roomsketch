@@ -316,6 +316,18 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     setState((s) => ({ ...s, furniture: [...s.furniture, item], selectedItemId: item.id }));
   }, [pushUndo]);
 
+  /** Duplicate a furniture item — full clone with new ID, offset +20cm, auto-selected. */
+  const duplicateFurniture = useCallback((source: FurnitureItem) => {
+    pushUndo();
+    const newItem: FurnitureItem = {
+      ...source,
+      id: generateId(),
+      x: source.x + 20,
+      y: source.y + 20,
+    };
+    setState((s) => ({ ...s, furniture: [...s.furniture, newItem], selectedItemId: newItem.id }));
+  }, [pushUndo]);
+
   const moveFurniture = useCallback((id: string, x: number, y: number) => {
     setState((s) => ({
       ...s,
@@ -910,6 +922,7 @@ export function useEditor(storageKey: string = DEFAULT_AUTOSAVE_KEY) {
     removeWall,
     updateWall,
     addFurniture,
+    duplicateFurniture,
     moveWall,
     moveFurniture,
     nudgeFurniture,
