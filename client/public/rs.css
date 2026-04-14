@@ -424,6 +424,10 @@ img { max-width: 100%; height: auto; display: block; }
 /* ─── Scroll animation ────────────────────────── */
 .fade-in { opacity: 0; transform: translateY(16px); transition: opacity 0.55s ease, transform 0.55s ease; }
 .fade-in.visible { opacity: 1; transform: none; }
+/* Blog article body must be visible immediately — fade-in hides it on mobile
+   because the hero pushes content below the viewport and the IntersectionObserver
+   never fires until scroll. */
+article .prose.fade-in { opacity: 1; transform: none; }
 
 /* ─── Mobile nav ──────────────────────────────── */
 .nav-mobile-toggle { display: none; }
