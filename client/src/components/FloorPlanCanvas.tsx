@@ -1581,7 +1581,7 @@ export default function FloorPlanCanvas({
           }
           prevDidSnap.current = snapResult.didSnap;
           // Snap opening thickness to wall thickness
-          const isOpening = furn.type === "door" || furn.type === "door_double" || furn.type === "window" || furn.type === "radiator";
+          const isOpening = furn.type === "door" || furn.type === "door_double" || furn.type === "window" || furn.type === "bay_window" || furn.type === "radiator";
           if (isOpening && snapResult.didSnap && snapResult.snappedWallThickness != null && furn.height !== snapResult.snappedWallThickness) {
             onUpdateFurniture(state.selectedItemId, { height: snapResult.snappedWallThickness });
           }
