@@ -6852,6 +6852,11 @@ export function collectComponentLabelRects(
     const centerY = (item.y + item.height / 2) * pxPerCm + panOffset.y;
     const itemWidthPx = item.width * pxPerCm;
     const itemHeightPx = item.height * pxPerCm;
+    const rad = (item.rotation * Math.PI) / 180;
+    const cosA = Math.abs(Math.cos(rad));
+    const sinA = Math.abs(Math.sin(rad));
+    const visualWidthPx = itemWidthPx * cosA + itemHeightPx * sinA;
+    const visualHeightPx = itemWidthPx * sinA + itemHeightPx * cosA;
     const isSelected = item.id === selectedId;
     const centerX = baseCenterX;
 
@@ -6895,8 +6900,8 @@ export function collectComponentLabelRects(
     const isLabelInsideType = item.labelInside ?? LABEL_INSIDE_TYPES.has(item.type);
     const isInside = isLabelInsideType
       && !isWallCupboard(item.type)
-      && pillW < itemWidthPx * 0.95
-      && pillH < itemHeightPx * 0.85;
+      && pillW < visualWidthPx * 0.95
+      && pillH < visualHeightPx * 0.85;
 
     // Apply labelOffset (stored in cm, convert to px)
     const offsetPx = item.labelOffset
@@ -6927,7 +6932,7 @@ export function collectComponentLabelRects(
       }
     } else {
       labelX = centerX + offsetPx.x;
-      labelY = centerY + itemHeightPx / 2 + 14 * zoom + offsetPx.y;
+      labelY = centerY + visualHeightPx / 2 + 14 * zoom + offsetPx.y;
     }
 
     const nameColor = isSelected
