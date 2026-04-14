@@ -4762,10 +4762,14 @@ export function snapToWallBody(
       y: wall.start.y + t * dy,
     };
 
-    // Skip points very close to endpoints — those are handled by endpoint snap
+    // Skip points near endpoints — those are handled by snapToWallEndpoints.
+    // The exclusion zone must cover the full endpoint-snap threshold so body
+    // snap never wins over an endpoint snap when the cursor is close to a
+    // wall corner (the previous 5 cm zone was too small and let body snap
+    // fire when the cursor sat on the wall surface near an endpoint).
     const distToStart = Math.sqrt((closestOnWall.x - wall.start.x) ** 2 + (closestOnWall.y - wall.start.y) ** 2);
     const distToEnd = Math.sqrt((closestOnWall.x - wall.end.x) ** 2 + (closestOnWall.y - wall.end.y) ** 2);
-    if (distToStart < 5 || distToEnd < 5) continue;
+    if (distToStart < threshold || distToEnd < threshold) continue;
 
     const dist = Math.sqrt(
       (point.x - closestOnWall.x) ** 2 + (point.y - closestOnWall.y) ** 2
@@ -4879,6 +4883,12 @@ export function snapToWallInnerFace(
       x: wall.end.x - udx * halfThickness + insideNx * halfThickness,
       y: wall.end.y - udy * halfThickness + insideNy * halfThickness,
     };
+
+    // Skip when the cursor is close to a wall endpoint — endpoint snap
+    // should take priority over inner-face snap near corners.
+    const distToStart = Math.sqrt((point.x - wall.start.x) ** 2 + (point.y - wall.start.y) ** 2);
+    const distToEnd = Math.sqrt((point.x - wall.end.x) ** 2 + (point.y - wall.end.y) ** 2);
+    if (distToStart < threshold || distToEnd < threshold) continue;
 
     // Project point onto the inset segment, clamped to [0, 1].
     const segDx = innerEnd.x - innerStart.x;
