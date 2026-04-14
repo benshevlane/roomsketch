@@ -13,7 +13,6 @@ import {
   drawWalls,
   drawWallSegmentMeasurements,
   drawMeasurementIndicatorLines,
-  drawRoomCavityLabels,
   drawFurniture,
   drawRoomAreas,
   drawLabels,
@@ -398,7 +397,7 @@ export default function EditorCore({
         ? computeRoomLabelPositions(ctx, rooms, state.furniture, gridSize, zoom, state.roomNames, state.units)
         : new Map<string, Point>();
       if (rooms.length > 0) {
-        drawRoomAreas(ctx, rooms, gridSize, zoom, panOffset, isDark, state.units, state.roomNames, null, roomLabelPositions, state.roomLabelOffsets);
+        drawRoomAreas(ctx, rooms, gridSize, zoom, panOffset, isDark, state.units, state.roomNames, null, roomLabelPositions, state.roomLabelOffsets, state.walls, measureMode);
       }
 
       // Walls with measurement labels — always render all wall labels in the export,
@@ -421,9 +420,6 @@ export default function EditorCore({
 
       // Measurement indicator lines
       drawMeasurementIndicatorLines(ctx, state.walls, rooms, gridSize, zoom, panOffset, measureMode);
-
-      // Inside-mode cavity W × D label per detected room
-      drawRoomCavityLabels(ctx, state.walls, rooms, gridSize, zoom, panOffset, isDark, state.units, measureMode);
 
       // Wall segment measurements
       drawWallSegmentMeasurements(ctx, state.walls, state.furniture, gridSize, zoom, panOffset, isDark, state.units, measureMode, rooms);

@@ -4125,7 +4125,9 @@ export function drawRoomAreas(
   roomNames: Record<string, string> = {},
   selectedRoomKey: string | null = null,
   labelPositions: Map<string, Point> = new Map(),
-  roomLabelOffsets: Record<string, Point> = {}
+  roomLabelOffsets: Record<string, Point> = {},
+  walls: Wall[] = [],
+  measureMode: MeasureMode = "segment"
 ) {
   const pxPerCm = (gridSize * zoom) / 100;
 
@@ -4160,6 +4162,58 @@ export function drawRoomAreas(
     const areaText = formatArea(room.area, units);
     const isSelected = roomKey === selectedRoomKey;
 
+    // Compute cavity dimensions text if in inside measure mode
+    let dimsText: string | null = null;
+    if (measureMode === "inside" && walls.length > 0) {
+      const verts = room.vertices;
+      if (verts.length >= 3) {
+        const innerPoints: Point[] = [];
+        for (let i = 0; i < verts.length; i++) {
+          const a = verts[i];
+          const b = verts[(i + 1) % verts.length];
+          let matchWall: Wall | null = null;
+          for (const w of walls) {
+            const ab = (Math.abs(w.start.x - a.x) < 15 && Math.abs(w.start.y - a.y) < 15
+              && Math.abs(w.end.x - b.x) < 15 && Math.abs(w.end.y - b.y) < 15);
+            const ba = (Math.abs(w.start.x - b.x) < 15 && Math.abs(w.start.y - b.y) < 15
+              && Math.abs(w.end.x - a.x) < 15 && Math.abs(w.end.y - a.y) < 15);
+            if (ab || ba) { matchWall = w; break; }
+          }
+          const halfThickness = ((matchWall?.thickness) || DEFAULT_WALL_THICKNESS) / 2;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          if (len < 1) continue;
+          const insideNormal = computeInsideNormal({ start: a, end: b }, verts);
+          if (!insideNormal) continue;
+          const udx = dx / len;
+          const udy = dy / len;
+          innerPoints.push({
+            x: a.x + udx * halfThickness + insideNormal.nx * halfThickness,
+            y: a.y + udy * halfThickness + insideNormal.ny * halfThickness,
+          });
+          innerPoints.push({
+            x: b.x - udx * halfThickness + insideNormal.nx * halfThickness,
+            y: b.y - udy * halfThickness + insideNormal.ny * halfThickness,
+          });
+        }
+        if (innerPoints.length > 0) {
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+          for (const p of innerPoints) {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+          }
+          const cavityW = Math.max(0, maxX - minX);
+          const cavityD = Math.max(0, maxY - minY);
+          if (cavityW >= 5 && cavityD >= 5) {
+            dimsText = `${formatLength(cavityW, units)} × ${formatLength(cavityD, units)}`;
+          }
+        }
+      }
+    }
+
     // Compute room bounding box to check if label fits
     let minRX = Infinity, maxRX = -Infinity, minRY = Infinity, maxRY = -Infinity;
     for (const v of room.vertices) {
@@ -4176,14 +4230,21 @@ export function drawRoomAreas(
     // Adaptive font size: shrink to fit small rooms
     let nameFontSize = Math.max(11, 14 * zoom);
     let areaFontSize = Math.max(9, 11 * zoom);
+    let dimsFontSize = Math.max(9, 11 * zoom);
 
     // Measure text at current size and shrink if needed
     ctx.font = `600 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
     let nameWidth = ctx.measureText(roomName).width;
     ctx.font = `500 ${areaFontSize}px 'General Sans', 'DM Sans', sans-serif`;
     let areaWidth = ctx.measureText(areaText).width;
-    const maxTextWidth = Math.max(nameWidth, areaWidth);
-    const totalHeight = nameFontSize + areaFontSize + 4;
+    let maxTextWidth = Math.max(nameWidth, areaWidth);
+    let totalHeight = nameFontSize + areaFontSize + 4;
+    if (dimsText) {
+      ctx.font = `500 ${dimsFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+      const dimsWidth = ctx.measureText(dimsText).width;
+      maxTextWidth = Math.max(maxTextWidth, dimsWidth);
+      totalHeight += dimsFontSize + 2;
+    }
 
     // Shrink fonts if text doesn't fit the room
     if (maxTextWidth > roomWidthPx * 0.85 || totalHeight > roomHeightPx * 0.7) {
@@ -4195,6 +4256,7 @@ export function drawRoomAreas(
       const clampedScale = Math.max(0.4, Math.min(1, scaleFactor));
       nameFontSize *= clampedScale;
       areaFontSize *= clampedScale;
+      dimsFontSize *= clampedScale;
     }
 
     const baseColor = isSelected
@@ -4204,17 +4266,31 @@ export function drawRoomAreas(
       ? (isDark ? "rgba(79, 152, 163, 0.9)" : "rgba(1, 105, 111, 0.8)")
       : (isDark ? "rgba(79, 152, 163, 0.5)" : "rgba(1, 105, 111, 0.4)");
 
+    // Compute vertical layout: center the label block around cy
+    const lineGap = 2;
+    const blockHeight = nameFontSize + lineGap + areaFontSize + (dimsText ? lineGap + dimsFontSize : 0);
+    const topY = cy - blockHeight / 2;
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
     // Room name (larger, bolder)
     ctx.font = `600 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
     ctx.fillStyle = baseColor;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(roomName, cx, cy - areaFontSize * 0.4);
+    ctx.fillText(roomName, cx, topY + nameFontSize / 2);
 
     // Area (smaller, lighter)
     ctx.font = `500 ${areaFontSize}px 'General Sans', 'DM Sans', sans-serif`;
     ctx.fillStyle = areaColor;
-    ctx.fillText(areaText, cx, cy + nameFontSize * 0.5);
+    ctx.fillText(areaText, cx, topY + nameFontSize + lineGap + areaFontSize / 2);
+
+    // Dimensions (same size as area, green)
+    if (dimsText) {
+      const dimsColor = isDark ? "#3ddc81" : "#2ecc71";
+      ctx.font = `500 ${dimsFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+      ctx.fillStyle = dimsColor;
+      ctx.fillText(dimsText, cx, topY + nameFontSize + lineGap + areaFontSize + lineGap + dimsFontSize / 2);
+    }
   });
 }
 

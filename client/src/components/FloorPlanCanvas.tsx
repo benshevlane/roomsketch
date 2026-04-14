@@ -6,7 +6,6 @@ import {
   drawWalls,
   drawWallSegmentMeasurements,
   drawMeasurementIndicatorLines,
-  drawRoomCavityLabels,
   collectWallMeasurementLabelRects,
   drawFurniture,
   drawWallPreview,
@@ -333,7 +332,7 @@ export default function FloorPlanCanvas({
     detectedRoomsRef.current = rooms;
     roomLabelPositionsRef.current = roomLabelPositions;
     if (rooms.length > 0) {
-      drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey, roomLabelPositions, state.roomLabelOffsets);
+      drawRoomAreas(ctx, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, state.roomNames, selectedRoomKey, roomLabelPositions, state.roomLabelOffsets, state.walls, measureMode);
     }
 
     // Walls — cache resolved label positions for accurate hit testing
@@ -355,9 +354,6 @@ export default function FloorPlanCanvas({
 
     // Measurement indicator lines (on top of walls, below labels/furniture)
     drawMeasurementIndicatorLines(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, measureMode);
-
-    // Inside-mode cavity W × D label per detected room
-    drawRoomCavityLabels(ctx, state.walls, rooms, state.gridSize, state.zoom, state.panOffset, isDark, state.units, measureMode);
 
     // Parallel wall discrepancy detection
     const flaggedWalls = findParallelWallDiscrepancies(state.walls);
