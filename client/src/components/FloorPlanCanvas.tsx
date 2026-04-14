@@ -386,7 +386,7 @@ export default function FloorPlanCanvas({
         }
       }
       // Check snap against raw world position for accurate distance
-      let { snapped: wallSnapped, didSnap: epSnap } = snapToWallEndpoints(worldMouse, state.walls, 15);
+      let { snapped: wallSnapped, didSnap: epSnap } = snapToWallEndpoints(worldMouse, state.walls, 15, state.gridSize, state.zoom);
       // Chain-start closure in preview
       if (!epSnap && state.wallChainStart && state.walls.length >= 2) {
         const csResult = snapToChainStart(worldMouse, state.wallChainStart, 15, state.gridSize, state.zoom);
@@ -590,7 +590,7 @@ export default function FloorPlanCanvas({
       const worldMouse = screenToWorld(mousePos.x, mousePos.y, state.gridSize, state.zoom, state.panOffset);
       const gridSnapped = snapToGrid(worldMouse, 1);
       // Check snap against raw world position for accurate distance
-      const { snapped: epSnapped, didSnap: epSnapIdle } = snapToWallEndpoints(worldMouse, state.walls, 15);
+      const { snapped: epSnapped, didSnap: epSnapIdle } = snapToWallEndpoints(worldMouse, state.walls, 15, state.gridSize, state.zoom);
       if (epSnapIdle) {
         drawSnapIndicator(ctx, epSnapped, state.gridSize, state.zoom, state.panOffset);
       } else {
@@ -1030,7 +1030,7 @@ export default function FloorPlanCanvas({
         }
         // Check endpoint snap against RAW world position (not grid-snapped)
         // so that the threshold accurately reflects cursor distance
-        let { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15);
+        let { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15, state.gridSize, state.zoom);
         // Chain-start closure: screen-space-aware snap to first point of the chain
         if (!endpointSnap && state.wallChainStart && wallDrawingRef.current && state.walls.length >= 2) {
           const csResult = snapToChainStart(world, state.wallChainStart, 15, state.gridSize, state.zoom);
@@ -1599,7 +1599,7 @@ export default function FloorPlanCanvas({
         if (innerFaceHit) {
           setWallSnapPoint(innerFaceHit);
         } else {
-          const { snapped: epSnapped, didSnap: epSnap } = snapToWallEndpoints(world, state.walls, 15);
+          const { snapped: epSnapped, didSnap: epSnap } = snapToWallEndpoints(world, state.walls, 15, state.gridSize, state.zoom);
           if (epSnap) {
             setWallSnapPoint(epSnapped);
           } else if (state.wallChainStart && state.wallDrawing && state.walls.length >= 2) {
@@ -1803,7 +1803,7 @@ export default function FloorPlanCanvas({
               innerFaceSnap = true;
             }
           }
-          let { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15);
+          let { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15, state.gridSize, state.zoom);
           // Chain-start closure: screen-space-aware snap to first point of the chain
           if (!endpointSnap && state.wallChainStart && state.walls.length >= 2) {
             const csResult = snapToChainStart(world, state.wallChainStart, 15, state.gridSize, state.zoom);

@@ -4633,17 +4633,33 @@ export function finalizeWallEndpoint(
   end: Point,
   alreadySnapped: boolean,
 ): Point {
-  if (alreadySnapped) return snapToGrid(end, 1);
+  // When the endpoint already snapped to an existing feature (endpoint, body,
+  // inner-face, or chain-start), return the exact coordinates — grid-rounding
+  // could shift the point away from the target and cause overshoot/tilt when
+  // closing a room.
+  if (alreadySnapped) return end;
   return snapToCardinal(start, end, 20);
 }
 
 export function snapToWallEndpoints(
   point: Point,
   walls: Wall[],
-  threshold: number = 15
+  threshold: number = 15,
+  gridSize?: number,
+  zoom?: number,
+  minScreenPx: number = 12
 ): { snapped: Point; didSnap: boolean } {
+  // Screen-space-aware threshold: ensure the snap zone is always at least
+  // minScreenPx pixels on screen so endpoint snapping works at any zoom level
+  // (matching snapToChainStart behaviour).
+  let effectiveThreshold = threshold;
+  if (gridSize !== undefined && zoom !== undefined) {
+    const pxPerCm = (gridSize * zoom) / 100;
+    effectiveThreshold = Math.max(threshold, minScreenPx / pxPerCm);
+  }
+
   let closest: Point | null = null;
-  let closestDist = threshold;
+  let closestDist = effectiveThreshold;
 
   for (const wall of walls) {
     for (const ep of [wall.start, wall.end]) {
