@@ -3257,6 +3257,53 @@ function drawFurnitureDetail(
       ctx.textBaseline = "middle";
       ctx.fillText("B", 0, 0);
       break;
+    case "floor_cupboard": {
+      // Door line across the front edge (bottom edge in local coords)
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, h / 2);
+      ctx.lineTo(w / 2, h / 2);
+      ctx.stroke();
+      // Diagonal door-swing indicator from hinge (bottom-left) to opposite corner
+      ctx.globalAlpha = 0.45;
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, h / 2);
+      ctx.lineTo(w / 2, -h / 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "drawer_unit_2":
+    case "drawer_unit_3": {
+      const drawers = type === "drawer_unit_2" ? 2 : 3;
+      const sectionH = h / drawers;
+      // Divider lines between drawers
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.55;
+      for (let i = 1; i < drawers; i++) {
+        const yDiv = -h / 2 + sectionH * i;
+        ctx.beginPath();
+        ctx.moveTo(-w / 2, yDiv);
+        ctx.lineTo(w / 2, yDiv);
+        ctx.stroke();
+      }
+      // Handle mark centred on the front edge of each drawer
+      ctx.lineWidth = 2;
+      const handleW = w * 0.35;
+      for (let i = 0; i < drawers; i++) {
+        const yFront = -h / 2 + sectionH * (i + 1);
+        ctx.beginPath();
+        ctx.moveTo(-handleW / 2, yFront - sectionH * 0.12);
+        ctx.lineTo(handleW / 2, yFront - sectionH * 0.12);
+        ctx.stroke();
+      }
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 1;
+      break;
+    }
     case "corner_bath": {
       // Inner rim rectangle
       ctx.globalAlpha = 0.3;

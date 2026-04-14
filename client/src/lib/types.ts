@@ -260,6 +260,9 @@ export const FURNITURE_LIBRARY: FurnitureTemplate[] = [
   { type: "wall_cupboard_double", label: "Wall Cupboard (double)", width: 100, height: 35, category: "Kitchen", icon: "square", isWallCupboard: true, defaultHeightFromFloor: 145 },
   { type: "wall_cupboard_corner", label: "Corner Wall Cupboard", width: 90, height: 90, category: "Kitchen", icon: "square", isWallCupboard: true, defaultHeightFromFloor: 145 },
   { type: "boiler", label: "Boiler", width: 60, height: 60, category: "Kitchen", icon: "flame" },
+  { type: "floor_cupboard", label: "Floor Cupboard", width: 60, height: 60, category: "Kitchen", icon: "square" },
+  { type: "drawer_unit_2", label: "2-Drawer Unit", width: 50, height: 60, category: "Kitchen", icon: "square" },
+  { type: "drawer_unit_3", label: "3-Drawer Unit", width: 50, height: 60, category: "Kitchen", icon: "square" },
   // Living (ordered: 3-Seat Sofa → 2-Seat Sofa → L-Shape Sofa → Armchair → Coffee Table → Side Table → TV Unit → Bookshelf → Fireplace)
   { type: "sofa_3", label: "3-Seat Sofa", width: 220, height: 90, category: "Living", icon: "sofa" },
   { type: "sofa_2", label: "2-Seat Sofa", width: 160, height: 85, category: "Living", icon: "sofa" },
