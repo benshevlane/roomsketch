@@ -7009,36 +7009,59 @@ export function collectComponentLabelRects(
     const isLabelInsideType = item.labelInside ?? LABEL_INSIDE_TYPES.has(item.type);
     let isInside = isLabelInsideType && !isWallCupboard(item.type);
 
+    // Use the item's actual (unrotated) dimensions for fit checks, since
+    // drawInsideComponentLabel renders in the item's local rotated space.
+    // Using the AABB (visualWidthPx/visualHeightPx) caused premature
+    // inside→outside flips for rotated items.
+    const fitWidthPx = itemWidthPx;
+    const fitHeightPx = itemHeightPx;
+
     // For inside labels, try scaling font down before moving outside
     if (isInside && !hasCustomSize) {
-      const targetW = visualWidthPx * 0.95;
-      const targetH = visualHeightPx * 0.85;
-      const MIN_NAME_FONT = 7;
-      const MIN_DIM_FONT = 6;
+      // Try fitting label in both orientations: normal and rotated 90°
+      // (for tall narrow items where the label should rotate to fit)
+      const fitsInRect = (pw: number, ph: number, rw: number, rh: number) =>
+        pw < rw * 0.95 && ph < rh * 0.85;
 
-      // Scale down font if label doesn't fit, down to minimum
-      while (
-        (autoPillW >= targetW || autoPillH >= targetH) &&
-        nameFontSize > MIN_NAME_FONT
-      ) {
-        nameFontSize = Math.max(MIN_NAME_FONT, nameFontSize - 0.5);
-        dimFontSize = Math.max(MIN_DIM_FONT, dimFontSize - 0.5);
-        ({ pillW: autoPillW, pillH: autoPillH } = measurePill(nameFontSize, dimFontSize));
-      }
+      const fitsNormal = fitsInRect(autoPillW, autoPillH, fitWidthPx, fitHeightPx);
+      const fitsRotated = fitsInRect(autoPillW, autoPillH, fitHeightPx, fitWidthPx);
 
-      // If still doesn't fit at minimum font size, move outside
-      if (autoPillW >= targetW || autoPillH >= targetH) {
-        isInside = false;
-        // Reset font sizes back to default for the outside label
-        nameFontSize = Math.max(9, 11 * zoom);
-        dimFontSize = Math.max(8, 9 * zoom);
-        ({ pillW: autoPillW, pillH: autoPillH } = measurePill(nameFontSize, dimFontSize));
+      if (!fitsNormal && !fitsRotated) {
+        const MIN_NAME_FONT = 7;
+        const MIN_DIM_FONT = 6;
+
+        // Scale down font if label doesn't fit, down to minimum
+        while (
+          !fitsInRect(autoPillW, autoPillH, fitWidthPx, fitHeightPx) &&
+          !fitsInRect(autoPillW, autoPillH, fitHeightPx, fitWidthPx) &&
+          nameFontSize > MIN_NAME_FONT
+        ) {
+          nameFontSize = Math.max(MIN_NAME_FONT, nameFontSize - 0.5);
+          dimFontSize = Math.max(MIN_DIM_FONT, dimFontSize - 0.5);
+          ({ pillW: autoPillW, pillH: autoPillH } = measurePill(nameFontSize, dimFontSize));
+        }
+
+        // If still doesn't fit at minimum font size, move outside
+        if (
+          !fitsInRect(autoPillW, autoPillH, fitWidthPx, fitHeightPx) &&
+          !fitsInRect(autoPillW, autoPillH, fitHeightPx, fitWidthPx)
+        ) {
+          isInside = false;
+          // Reset font sizes back to default for the outside label
+          nameFontSize = Math.max(9, 11 * zoom);
+          dimFontSize = Math.max(8, 9 * zoom);
+          ({ pillW: autoPillW, pillH: autoPillH } = measurePill(nameFontSize, dimFontSize));
+        }
       }
     } else if (isInside) {
       // Custom size: just check fit without scaling
       const pw = item.labelWidth != null ? item.labelWidth * pxPerCm : autoPillW;
       const ph = item.labelHeight != null ? item.labelHeight * pxPerCm : autoPillH;
-      if (pw >= visualWidthPx * 0.95 || ph >= visualHeightPx * 0.85) {
+      // Check both orientations for custom sizes too
+      if (
+        (pw >= fitWidthPx * 0.95 || ph >= fitHeightPx * 0.85) &&
+        (pw >= fitHeightPx * 0.95 || ph >= fitWidthPx * 0.85)
+      ) {
         isInside = false;
       }
     }
