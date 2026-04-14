@@ -665,9 +665,7 @@ function getWallLabelFontSize(
     return Math.max(11, 12 * zoom);
   }
   if (mode === "showAll") {
-    if (displayLengthCm < 20) return Math.max(8, 8 * zoom);
-    if (displayLengthCm < 50) return Math.max(10, 10 * zoom);
-    if (displayLengthCm < 100) return Math.max(12, 12 * zoom);
+    // When "show all" is on, use full-size font for ALL walls (including short ones)
     return Math.max(11, 12 * zoom);
   }
   // default (only reached for walls ≥ 1 m in default mode)
@@ -6885,7 +6883,8 @@ export function collectComponentLabelRects(
       dimFontSize = Math.max(8, 9 * zoom);
     }
 
-    ctx.font = `${isSelected ? "600" : "500"} ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+    // Always measure with weight "500" so isInside doesn't flip when item is selected
+    ctx.font = `500 ${nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
     const nameWidth = ctx.measureText(displayName).width;
     ctx.font = `400 ${dimFontSize}px 'General Sans', 'DM Sans', sans-serif`;
     const dimWidth = ctx.measureText(dimText).width;
@@ -6956,7 +6955,8 @@ function drawInsideComponentLabel(
   pxPerCm: number,
   panOffset: Point,
   isDark: boolean,
-  zoom: number = 1
+  zoom: number = 1,
+  isHovered: boolean = false
 ) {
   const item = info.item;
   // Hide label when item is too small on screen
@@ -6992,7 +6992,8 @@ function drawInsideComponentLabel(
   const labelX = offsetPx.x;
 
   // Name
-  ctx.font = `${info.isSelected ? "600" : "500"} ${info.nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
+  const nameWeight = info.isSelected ? "600" : isHovered ? "600" : "500";
+  ctx.font = `${nameWeight} ${info.nameFontSize}px 'General Sans', 'DM Sans', sans-serif`;
   ctx.fillStyle = info.nameColor;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
@@ -7171,7 +7172,8 @@ function drawSingleComponentLabel(
   info: ComponentLabelInfo,
   drawX: number,
   drawY: number,
-  isDark: boolean
+  isDark: boolean,
+  isHovered: boolean = false
 ) {
   const { displayName, dimText, nameFontSize, dimFontSize, pillW, pillH, isSelected, nameColor, labelRotation } = info;
 
@@ -7189,7 +7191,11 @@ function drawSingleComponentLabel(
   // Background pill
   const pillX = drawX - pillW / 2;
   const pillY = drawY - 2;
-  ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.7)" : "rgba(247, 246, 242, 0.75)";
+  if (isHovered) {
+    ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.85)" : "rgba(237, 235, 229, 0.92)";
+  } else {
+    ctx.fillStyle = isDark ? "rgba(23, 22, 20, 0.7)" : "rgba(247, 246, 242, 0.75)";
+  }
   ctx.beginPath();
   const r = 4;
   ctx.moveTo(pillX + r, pillY);
@@ -7303,7 +7309,8 @@ export function resolveAndDrawLabelCollisions(
   selectedId: string | null,
   labelPositions: Map<string, Point> = new Map(),
   distanceMeasurementRects: DistanceMeasurementLabelInfo[] = [],
-  wallMeasurementRects: { centerX: number; centerY: number; halfW: number; halfH: number }[] = []
+  wallMeasurementRects: { centerX: number; centerY: number; halfW: number; halfH: number }[] = [],
+  hoveredComponentLabelId: string | null = null
 ): void {
   // Collect all label rects with priority
   const allRects: LabelRect[] = [];
@@ -7442,14 +7449,16 @@ export function resolveAndDrawLabelCollisions(
         const info = componentLabelInfos[rect.sourceIndex];
         // rect.y is the center of the label rect; convert back to top-of-label Y
         const resolvedLabelY = rect.y - info.pillH / 2 + 2;
-        drawSingleComponentLabel(ctx, info, rect.x, resolvedLabelY, isDark);
+        const isLabelHovered = hoveredComponentLabelId === info.item.id;
+        drawSingleComponentLabel(ctx, info, rect.x, resolvedLabelY, isDark, isLabelHovered);
       }
     }
 
     // Draw inside-component labels (not collision-resolved, anchored inside)
     for (const info of componentLabelInfos) {
       if (info.isInside) {
-        drawInsideComponentLabel(ctx, info, pxPerCm, panOffset, isDark, zoom);
+        const isLabelHovered = hoveredComponentLabelId === info.item.id;
+        drawInsideComponentLabel(ctx, info, pxPerCm, panOffset, isDark, zoom, isLabelHovered);
       }
     }
 

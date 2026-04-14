@@ -173,6 +173,7 @@ export default function FloorPlanCanvas({
   const [isDraggingLabel, setIsDraggingLabel] = useState(false);
   const [draggingLabelId, setDraggingLabelId] = useState<string | null>(null);
   const [labelDragStart, setLabelDragStart] = useState<{ x: number; y: number; offsetX: number; offsetY: number }>({ x: 0, y: 0, offsetX: 0, offsetY: 0 });
+  const [hoveredComponentLabelId, setHoveredComponentLabelId] = useState<string | null>(null);
   const componentLabelInfosRef = useRef<ComponentLabelInfo[]>([]);
 
   // Cached render-loop data for hover detection
@@ -571,7 +572,8 @@ export default function FloorPlanCanvas({
       ctx, rooms, state.walls, componentLabelInfos, state.labels,
       state.gridSize, state.zoom, state.panOffset, isDark,
       state.roomNames, state.componentLabelsVisible, state.selectedItemId,
-      roomLabelPositions, distanceMeasurementRects, wallMeasurementRects
+      roomLabelPositions, distanceMeasurementRects, wallMeasurementRects,
+      hoveredComponentLabelId
     );
 
     // Arrows
@@ -802,19 +804,7 @@ export default function FloorPlanCanvas({
             (info) => info.item.id === state.selectedItemId && info.isSelected
           );
           if (selectedLabelInfo) {
-            // Rotate handle
-            if (hitTestLabelRotateHandle(pos.x, pos.y, selectedLabelInfo)) {
-              const cx = selectedLabelInfo.centerX;
-              const cy = selectedLabelInfo.labelY + selectedLabelInfo.pillH / 2 - 2;
-              const startAngle = Math.atan2(pos.y - cy, pos.x - cx);
-              setIsRotatingLabel(true);
-              setRotatingLabelId(state.selectedItemId);
-              setLabelRotateStartAngle(startAngle);
-              setLabelRotateItemStartRot(selectedLabelInfo.labelRotation);
-              onPushUndo();
-              return;
-            }
-            // Resize handle
+            // Resize handle — check before rotate to avoid overlap at small label sizes
             if (hitTestLabelResizeHandle(pos.x, pos.y, selectedLabelInfo)) {
               setIsResizingLabel(true);
               setResizingLabelId(state.selectedItemId);
@@ -825,6 +815,18 @@ export default function FloorPlanCanvas({
                 labelH: selectedLabelInfo.pillH,
                 labelRotation: selectedLabelInfo.labelRotation,
               });
+              onPushUndo();
+              return;
+            }
+            // Rotate handle
+            if (hitTestLabelRotateHandle(pos.x, pos.y, selectedLabelInfo)) {
+              const cx = selectedLabelInfo.centerX;
+              const cy = selectedLabelInfo.labelY + selectedLabelInfo.pillH / 2 - 2;
+              const startAngle = Math.atan2(pos.y - cy, pos.x - cx);
+              setIsRotatingLabel(true);
+              setRotatingLabelId(state.selectedItemId);
+              setLabelRotateStartAngle(startAngle);
+              setLabelRotateItemStartRot(selectedLabelInfo.labelRotation);
               onPushUndo();
               return;
             }
@@ -846,6 +848,7 @@ export default function FloorPlanCanvas({
                 offsetX: currentOffset.x,
                 offsetY: currentOffset.y,
               });
+              onPushUndo();
               return;
             }
             // If component not yet selected, move the whole component
@@ -1739,11 +1742,21 @@ export default function FloorPlanCanvas({
         if (!hoveredElementsEqual(selectHoverElement, hit)) {
           setSelectHoverElement(hit);
         }
-      } else if (selectHoverElement) {
-        setSelectHoverElement(null);
+        // Track hovered component label for visual highlight
+        const newHoveredLabelId = hit?.kind === "componentLabel" ? hit.itemId : null;
+        if (newHoveredLabelId !== hoveredComponentLabelId) {
+          setHoveredComponentLabelId(newHoveredLabelId);
+        }
+      } else {
+        if (selectHoverElement) {
+          setSelectHoverElement(null);
+        }
+        if (hoveredComponentLabelId) {
+          setHoveredComponentLabelId(null);
+        }
       }
     },
-    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isDraggingWallLabel, draggingWallLabelId, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, selectHoverElement, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset, onUpdateWallLabelOffset, isDark, measureMode, onSelectItem, hoveredClusterIds]
+    [state, isPanning, isDragging, isDraggingLabel, draggingLabelId, labelDragStart, isDraggingRoomLabel, draggingRoomKey, roomLabelDragStart, isDraggingWallLabel, draggingWallLabelId, isResizing, isRotating, rotateStartAngle, rotateItemStartRot, resizeStart, resizeCorner, dragStart, dragItemOffset, eraserHoverId, selectHoverElement, hoveredComponentLabelId, arrowDraggingEndpoint, arrowBodyDragStart, wallDragStart, isRotatingLabel, rotatingLabelId, labelRotateStartAngle, labelRotateItemStartRot, isResizingLabel, resizingLabelId, labelResizeStart, getCanvasPos, onSetPan, onSetZoom, onMoveFurniture, onMoveWall, onMoveLabel, onUpdateFurniture, onUpdateArrow, onSetLabelOffset, onSetRoomLabelOffset, onUpdateWallLabelOffset, isDark, measureMode, onSelectItem, hoveredClusterIds]
   );
 
   // Cancel any pending hover-cluster clear timer on unmount.
