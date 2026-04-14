@@ -1032,11 +1032,13 @@ export default function FloorPlanCanvas({
         // so that the threshold accurately reflects cursor distance
         let { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15, state.gridSize, state.zoom);
         // Chain-start closure: screen-space-aware snap to first point of the chain
+        let closesChain = false;
         if (!endpointSnap && state.wallChainStart && wallDrawingRef.current && state.walls.length >= 2) {
           const csResult = snapToChainStart(world, state.wallChainStart, 15, state.gridSize, state.zoom);
           if (csResult.didSnap) {
             wallSnapped = csResult.snapped;
             endpointSnap = true;
+            closesChain = true;
           }
         }
         // Also check wall body snap (for mid-wall connections)
@@ -1079,6 +1081,10 @@ export default function FloorPlanCanvas({
               if (endpointSnap || innerFaceSnap) {
                 onSetWallDrawing(null);
                 wallDrawingRef.current = null;
+                // Auto-exit wall mode when closing a room (polygon completed)
+                if (closesChain) {
+                  onSetTool("select");
+                }
               } else {
                 onSetWallDrawing({ start: finalPoint });
                 wallDrawingRef.current = { start: finalPoint };
@@ -1805,11 +1811,13 @@ export default function FloorPlanCanvas({
           }
           let { snapped: wallSnapped, didSnap: endpointSnap } = snapToWallEndpoints(world, state.walls, 15, state.gridSize, state.zoom);
           // Chain-start closure: screen-space-aware snap to first point of the chain
+          let closesChain = false;
           if (!endpointSnap && state.wallChainStart && state.walls.length >= 2) {
             const csResult = snapToChainStart(world, state.wallChainStart, 15, state.gridSize, state.zoom);
             if (csResult.didSnap) {
               wallSnapped = csResult.snapped;
               endpointSnap = true;
+              closesChain = true;
             }
           }
           const { snapped: bodySnapped, didSnap: bodySnap, wallId: bodyWallId } = snapToWallBody(world, state.walls, 15);
@@ -1846,6 +1854,10 @@ export default function FloorPlanCanvas({
             if (endpointSnap || innerFaceSnap) {
               onSetWallDrawing(null);
               wallDrawingRef.current = null;
+              // Auto-exit wall mode when closing a room (polygon completed)
+              if (closesChain) {
+                onSetTool("select");
+              }
             } else {
               onSetWallDrawing({ start: finalPoint });
               wallDrawingRef.current = { start: finalPoint };
